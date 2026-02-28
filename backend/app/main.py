@@ -92,8 +92,9 @@ app.include_router(ai.router)
 # ── Root & Health ─────────────────────────────────────
 
 @app.get("/", tags=["Health"])
+@app.post("/", tags=["Health"])
 async def root():
-    """API root — basic info."""
+    """API root — basic info. Accepts GET and POST (for systems that POST to base URL)."""
     return {
         "name": "🌊 Smart Irrigation API",
         "version": "1.0.0",
@@ -101,6 +102,11 @@ async def root():
         "websocket_endpoints": [
             "ws://localhost:8000/ws/sensors",
             "ws://localhost:8000/ws/alerts",
+        ],
+        "webhook_endpoints": [
+            "POST /webhook/ingest — IoT sensor data",
+            "POST /webhook/wasenderapi — WaSendAPI inbound",
+            "POST /webhook/whatsapp/send — Send WhatsApp notification",
         ],
     }
 

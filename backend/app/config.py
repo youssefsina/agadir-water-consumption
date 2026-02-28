@@ -4,6 +4,12 @@ Application configuration.
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+# Load .env from backend/ before reading env vars
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(_env_path)
+
 # ── Paths ──────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent          # backend/
 DATA_DIR = BASE_DIR                                        # CSVs live in backend/
@@ -36,6 +42,18 @@ NUM_FEATURES = len(FEATURE_COLS)
 
 # ── Webhook ────────────────────────────────────────────
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "dev-secret-key-change-me")
+# WaSendAPI: secret from dashboard → Webhook settings (for X-Webhook-Signature verification)
+WASENDER_WEBHOOK_SECRET = os.getenv("WASENDER_WEBHOOK_SECRET", "")
+
+# ── WhatsApp (WaSendAPI) ──────────────────────────────
+# WaSendAPI API key: https://www.wasenderapi.com
+WHATSAPP_ACCESS_TOKEN = os.getenv("WHATSAPP_ACCESS_TOKEN", "")
+# Default recipients for alerts (comma-separated, e.g. "212612345678,212698765432")
+WHATSAPP_DEFAULT_RECIPIENTS = [
+    p.strip()
+    for p in (os.getenv("WHATSAPP_DEFAULT_RECIPIENTS", "") or "").split(",")
+    if p.strip()
+]
 
 # ── CORS (allow frontend) ─────────────────────────────
 CORS_ORIGINS = [

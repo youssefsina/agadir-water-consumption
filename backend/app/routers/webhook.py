@@ -13,8 +13,9 @@ from typing import List
 
 from fastapi import APIRouter, HTTPException, Header, Request
 
-from app.config import WEBHOOK_SECRET
-from app.models.schemas import WebhookPayload, WebhookResponse
+from app.config import WEBHOOK_SECRET, WASENDER_WEBHOOK_SECRET
+from app.models.schemas import WebhookPayload, WebhookResponse, WhatsAppSendRequest
+from app.services.whatsapp_service import send_message as whatsapp_send_message
 
 router = APIRouter(prefix="/webhook", tags=["Webhooks"])
 
@@ -137,6 +138,104 @@ async def list_events(limit: int = 50, device_id: str = None, event_type: str = 
     return {
         "total": len(filtered),
         "events": filtered[-limit:],
+    }
+
+
+# ── WaSendAPI Inbound Webhook ──────────────────────────
+# Use this URL in WaSendAPI dashboard: https://YOUR_DOMAIN/webhook/wasenderapi
+
+@router.post(
+    "/wasenderapi",
+    summary="WaSendAPI webhook (inbound)",
+    description="Receives events from WaSendAPI (incoming messages, status updates). Enter this URL in WaSendAPI dashboard.",
+)
+async def wasenderapi_webhook(
+    request: Request,
+    x_webhook_signature: str = Header(None, alias="X-Webhook-Signature"),
+):
+    """
+    WaSendAPI posts events here (messages.received, messages.upsert, etc.).
+
+    In WaSendAPI dashboard → Session → Webhook URL, enter:
+        https://YOUR_PUBLIC_DOMAIN/webhook/wasenderapi
+
+    For local dev, use ngrok: https://xxx.ngrok.io/webhook/wasenderapi
+    """
+    body = await request.body()
+
+    # Verify signature (optional but recommended)
+    if WASENDER_WEBHOOK_SECRET and x_webhook_signature:
+        if x_webhook_signature != WASENDER_WEBHOOK_SECRET:
+            raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
+    import json
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+
+    event = data.get("event", "unknown")
+    event_id = str(uuid.uuid4())
+
+    # Store WaSendAPI event
+    _event_log.append({
+        "event_id": event_id,
+        "source": "wasenderapi",
+        "event": event,
+        "received_at": datetime.utcnow().isoformat(),
+        "data": data,
+    })
+    if len(_event_log) > MAX_LOG_SIZE:
+        _event_log.pop(0)
+
+    # Always return 200 quickly (WaSendAPI requirement)
+    return {"received": True, "event": event}
+
+
+# ── WhatsApp Notification Webhook ─────────────────────
+
+@router.post(
+    "/whatsapp/send",
+    summary="Send WhatsApp notification",
+    description="Send a message to WhatsApp. Connect your AI app to POST here when alerts or anomalies are detected. Requires X-Webhook-Signature header when WEBHOOK_SECRET is set.",
+)
+async def send_whatsapp(
+    payload: WhatsAppSendRequest,
+    x_webhook_signature: str = Header(None, alias="X-Webhook-Signature"),
+):
+    """
+    Outbound webhook for WhatsApp notifications.
+
+    Your AI app or external service can POST here to trigger WhatsApp alerts.
+
+    Example:
+        POST /webhook/whatsapp/send
+        {"message": "Anomaly detected in zone A", "to": "+212612345678"}
+
+    Or use recipients for multiple:
+        {"message": "Alert!", "recipients": ["212612345678", "212698765432"]}
+    """
+    if WEBHOOK_SECRET and x_webhook_signature:
+        if x_webhook_signature != WEBHOOK_SECRET:
+            raise HTTPException(status_code=403, detail="Invalid webhook secret")
+
+    result = whatsapp_send_message(
+        message=payload.message,
+        to=payload.to,
+        recipients=payload.recipients,
+    )
+
+    if result.get("success"):
+        return {
+            "status": "sent",
+            "message": f"Message sent to {result.get('sent_count', 0)} recipient(s).",
+            "results": result.get("results", []),
+        }
+
+    return {
+        "status": "failed",
+        "error": result.get("error", "Unknown error"),
+        "results": result.get("results", []),
     }
 
 
