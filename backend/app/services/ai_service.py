@@ -16,12 +16,14 @@ except ImportError:
     TORCH_AVAILABLE = False
     print("⚠️  torch not installed — AI service running in stub mode.")
 
-from app.config import MODEL_DIR, FEATURE_COLS, SEQUENCE_LENGTH, NUM_FEATURES
+from app.config import MODEL_DIR, FEATURE_COLS, SEQUENCE_LENGTH, NUM_FEATURES, BASE_DIR
 
 # ── Optional model imports (also depend on torch) ─────────────────────────────
 if TORCH_AVAILABLE:
     from app.models.rnn_model import IrrigationRNN, create_rnn_model
     from app.models.lstm_model import IrrigationLSTM, AttentionLSTM, create_lstm_model
+
+from app.models.rf_model import RandomForestModel
 
 
 class AIService:
@@ -36,6 +38,7 @@ class AIService:
             print(f"🤖 AI device: {self._device}")
         else:
             self._device = "cpu"
+        self.rf_model = RandomForestModel()
 
     # ── Model lifecycle ───────────────────────────────
 
@@ -90,6 +93,13 @@ class AIService:
 
         print(f"🤖 Initialized {len(self.models)} template models: {list(self.models.keys())}")
 
+        # ── Load Random Forest if model.pkl exists
+        pkl_path = BASE_DIR / "model.pkl"
+        if pkl_path.exists():
+            self.rf_model.load(pkl_path)
+        else:
+            print(f"⚠ model.pkl not found at {pkl_path} — run train_model.py to enable RF predictions")
+
     def list_models(self) -> List[dict]:
         """List all loaded models with metadata."""
         result = []
@@ -102,6 +112,17 @@ class AIService:
                 "device": str(self._device),
                 "trained": False,   # template models are untrained
             })
+
+        # Include Random Forest if loaded
+        if self.rf_model.is_loaded:
+            result.append({
+                "name": "random_forest",
+                "type": "RandomForestClassifier",
+                "parameters": self.rf_model.model.n_estimators,
+                "device": "cpu",
+                "trained": True,
+            })
+
         return result
 
     # ── Inference ─────────────────────────────────────
@@ -189,6 +210,10 @@ class AIService:
             }
 
         return {"model": model_name, "raw_output": result.tolist()}
+
+    def predict_sensor(self, values: dict) -> dict:
+        """Run Random Forest prediction on a single sensor reading."""
+        return self.rf_model.predict(values)
 
     # ── Save / Load ───────────────────────────────────
 
