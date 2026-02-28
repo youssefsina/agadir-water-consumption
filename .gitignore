@@ -1,14 +1,2 @@
-node_modules/
-.next/
-out/
-build/
-dist/
-.env
-.env.*.local
-.DS_Store
-__pycache__/
-*.pyc
-*.pyo
-venv/
-env/
-.venv/
+# Created by venv; see https://docs.python.org/3/library/venv.html
+*
