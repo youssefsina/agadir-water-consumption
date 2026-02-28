@@ -70,106 +70,78 @@ export default function Dashboard() {
   });
   const [history, setHistory] = useState<SensorData[]>([]);
 
-  // Simulation loop
+  // Real-time backend connection
   useEffect(() => {
-    // Generate initial history
-    if (history.length === 0) {
-      const initialHistory = [];
-      const now = new Date();
-      for (let i = 20; i >= 0; i--) {
-        const t = new Date(now.getTime() - i * 60000);
-        initialHistory.push({
-          time: `${t.getHours().toString().padStart(2, "0")}:${t.getMinutes().toString().padStart(2, "0")}`,
-          flow: 115 + Math.random() * 10,
-          pressure: 2.4 + Math.random() * 0.2,
-          moisture: 40 + Math.random() * 5,
-          temperature: 22 + Math.random() * 2,
-          anomalyScore: Math.random() * 10,
-        });
+    const ws = new WebSocket("ws://127.0.0.1:8000/pipeline/ws");
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "pipeline_tick") {
+          const { timestamp, sensor_data, prediction } = data;
+          const newData = {
+            time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+            flow: sensor_data.flow_lpm,
+            pressure: sensor_data.pressure_bar,
+            moisture: sensor_data.soil_moisture_pct,
+            temperature: sensor_data.temperature_c,
+            anomalyScore: prediction.is_anomaly ? prediction.confidence * 100 : Math.max(5, prediction.confidence * 20),
+          };
+
+          if (sensor_data.is_irrigating) {
+            setDecision("ON");
+          } else if (sensor_data.rain_probability > 0.6) {
+            setDecision("PAUSE");
+          } else {
+            setDecision("STOP");
+          }
+
+          setCurrentData(newData);
+          setHistory((prev) => [...prev.slice(-20), newData]); // keep last 20 points
+
+          if (prediction.is_anomaly) {
+            const anType = prediction.anomaly_type || "Unknown Anomaly";
+            addAlert(`${anType} detected! Confidence: ${(prediction.confidence * 100).toFixed(0)}%`, "destructive");
+          }
+        } else if (data.type === "history") {
+          const h = data.data.map((d: any) => ({
+            time: new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+            flow: d.sensor_data.flow_lpm,
+            pressure: d.sensor_data.pressure_bar,
+            moisture: d.sensor_data.soil_moisture_pct,
+            temperature: d.sensor_data.temperature_c,
+            anomalyScore: d.prediction.is_anomaly ? d.prediction.confidence * 100 : Math.max(5, d.prediction.confidence * 20),
+          }));
+
+          if (h.length > 0) {
+            setHistory(h.slice(-20)); // keep last 20 points from history
+            setCurrentData(h[h.length - 1]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to parse websocket message", err);
       }
-      setHistory(initialHistory);
+    };
+
+    ws.onerror = (err) => {
+      console.error("WebSocket error", err);
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, []);
+
+  const handleSetScenario = async (scen: Scenario, anomalyId: number) => {
+    setScenario(scen);
+    try {
+      await fetch(`http://127.0.0.1:8000/pipeline/set-anomaly?anomaly_type=${anomalyId}`, {
+        method: 'POST',
+      });
+    } catch (e) {
+      console.error("Failed to set scenario", e);
     }
-
-    const interval = setInterval(() => {
-      const now = new Date();
-      const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
-
-      let newFlow = 115 + Math.random() * 10;
-      let newPressure = 2.4 + Math.random() * 0.2;
-      let newMoisture = currentData.moisture + (decision === "ON" ? 0.5 : -0.2);
-      let newTemperature = 24 + Math.sin(now.getTime() / 10000) * 5;
-      let newAnomalyScore = Math.random() * 15;
-      let newDecision: DecisionState = "ON";
-
-      if (newMoisture > 100) newMoisture = 100;
-      if (newMoisture < 0) newMoisture = 0;
-
-      // Apply Scenario rules
-      if (scenario === "LEAK_NIGHT") {
-        newFlow = 30 + Math.random() * 10; // Flow when shouldn't be
-        newPressure = 2.0 + Math.random() * 0.1;
-        newAnomalyScore = 80 + Math.random() * 15;
-        newDecision = "STOP";
-        addAlert("Leak detected at night (Irrigation OFF but flow > 0)", "destructive");
-      } else if (scenario === "BURST") {
-        newFlow = 300 + Math.random() * 50; // Flow spike
-        newPressure = 0.5 + Math.random() * 0.3; // Pressure drop
-        newAnomalyScore = 95 + Math.random() * 5;
-        newDecision = "STOP";
-        addAlert("Pipe burst detected! Pressure dropped, flow spiked.", "destructive");
-      } else if (scenario === "OVER_IRR") {
-        newFlow = 120 + Math.random() * 10;
-        newMoisture = currentData.moisture + 2; // Rapidly climbing past 60%
-        if (newMoisture > 65) {
-          newDecision = "STOP";
-          newAnomalyScore = 60 + Math.random() * 20;
-          addAlert("Over-irrigation threshold reached. Moisture > 60%", "warning");
-        }
-      } else if (scenario === "UNDER_IRR") {
-        newFlow = 5 + Math.random() * 2; // Scheduled ON but no flow
-        newPressure = 2.5 + Math.random() * 0.1;
-        newAnomalyScore = 75 + Math.random() * 15;
-        newDecision = "ON"; // trying to pump but failing
-        addAlert("Under-irrigation! Pump issue or valve closed.", "destructive");
-      } else if (scenario === "RAIN") {
-        newDecision = "PAUSE";
-        newFlow = 0;
-        newPressure = 0;
-        newAnomalyScore = 5 + Math.random() * 5;
-        addAlert("High rain probability (>60%). Irrigation PAUSED.", "info");
-      } else {
-        // NORMAL
-        if (newMoisture > 60) {
-          newDecision = "STOP";
-        } else if (newMoisture < 25) {
-          newDecision = "ON";
-        } else {
-          newDecision = decision; // Keep current
-        }
-
-        if (newDecision === "STOP" || newDecision === "PAUSE") {
-          newFlow = 0;
-          newPressure = 0;
-        }
-      }
-
-      setDecision(newDecision);
-
-      const newData = {
-        time: timeStr,
-        flow: Math.max(0, newFlow),
-        pressure: Math.max(0, newPressure),
-        moisture: newMoisture,
-        temperature: newTemperature,
-        anomalyScore: newAnomalyScore,
-      };
-
-      setCurrentData(newData);
-      setHistory((prev) => [...prev.slice(-20), newData]); // keep last 20 points
-    }, 2000); // update every 2 seconds
-
-    return () => clearInterval(interval);
-  }, [scenario, currentData.moisture, decision, history.length]);
+  };
 
   const addAlert = (message: string, type: "warning" | "destructive" | "info") => {
     setAlerts((prev) => {
@@ -231,42 +203,42 @@ export default function Dashboard() {
             <div className="flex flex-wrap gap-2">
               <Button
                 variant={scenario === "NORMAL" ? "default" : "outline"}
-                onClick={() => setScenario("NORMAL")}
+                onClick={() => handleSetScenario("NORMAL", 0)}
                 className={scenario === "NORMAL" ? "bg-green-600 hover:bg-green-700 text-white" : "border-green-200 text-green-700 hover:bg-green-50"}
               >
                 Normal Operation
               </Button>
               <Button
                 variant={scenario === "LEAK_NIGHT" ? "destructive" : "outline"}
-                onClick={() => setScenario("LEAK_NIGHT")}
+                onClick={() => handleSetScenario("LEAK_NIGHT", 1)}
                 className={scenario !== "LEAK_NIGHT" ? "border-green-200 text-green-700 hover:bg-red-50 hover:text-red-600 hover:border-red-200" : ""}
               >
                 Leak at Night
               </Button>
               <Button
                 variant={scenario === "BURST" ? "destructive" : "outline"}
-                onClick={() => setScenario("BURST")}
+                onClick={() => handleSetScenario("BURST", 2)}
                 className={scenario !== "BURST" ? "border-green-200 text-green-700 hover:bg-red-50 hover:text-red-600 hover:border-red-200" : ""}
               >
                 Pipe Burst
               </Button>
               <Button
                 variant={scenario === "OVER_IRR" ? "default" : "outline"}
-                onClick={() => setScenario("OVER_IRR")}
+                onClick={() => handleSetScenario("OVER_IRR", 3)}
                 className={scenario === "OVER_IRR" ? "bg-yellow-500 hover:bg-yellow-600 text-white" : "border-green-200 text-green-700 hover:bg-yellow-50 hover:text-yellow-700 hover:border-yellow-200"}
               >
                 Over-Irrigation
               </Button>
               <Button
                 variant={scenario === "UNDER_IRR" ? "destructive" : "outline"}
-                onClick={() => setScenario("UNDER_IRR")}
+                onClick={() => handleSetScenario("UNDER_IRR", 4)}
                 className={scenario !== "UNDER_IRR" ? "border-green-200 text-green-700 hover:bg-red-50 hover:text-red-600 hover:border-red-200" : ""}
               >
                 Under-Irrigation
               </Button>
               <Button
                 variant={scenario === "RAIN" ? "secondary" : "outline"}
-                onClick={() => setScenario("RAIN")}
+                onClick={() => handleSetScenario("RAIN", 5)}
                 className={scenario === "RAIN" ? "bg-blue-500 hover:bg-blue-600 text-white" : "border-green-200 text-green-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200"}
               >
                 Rain Forecast

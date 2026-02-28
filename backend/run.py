@@ -21,7 +21,7 @@ def main():
 
     uvicorn.run(
         "app.main:app",
-        host=args.host,
+        host="localhost",
         port=args.port,
         reload=args.reload,
         log_level="info",

@@ -3,6 +3,10 @@ Application configuration.
 """
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # ── Paths ──────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent          # backend/
@@ -58,3 +62,7 @@ CORS_ORIGINS = [
     "http://127.0.0.1:5173",
     "*",
 ]
+
+# ── Supabase ───────────────────────────────────────────────
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")

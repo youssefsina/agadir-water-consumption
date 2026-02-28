@@ -135,3 +135,6 @@ class HealthStatus(BaseModel):
     data_rows_loaded: int = 0
     active_ws_connections: int = 0
     models_loaded: List[str] = []
+    pipeline_running: Optional[bool] = None
+    pipeline_stats: Optional[dict] = None
+
