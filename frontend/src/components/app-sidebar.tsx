@@ -1,3 +1,5 @@
+"use client";
+
 import {
     Sidebar,
     SidebarContent,
@@ -7,65 +9,44 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import { Droplets, Settings, Gauge, Map as MapIcon, CalendarRange, BrainCircuit, Router } from "lucide-react"
+} from "@/components/ui/sidebar";
+import { Droplets, Settings, Gauge, Map as MapIcon, CalendarRange, BrainCircuit, Router } from "lucide-react";
+import { useTranslations, useLocale } from "next-intl";
 
-const items = [
-    {
-        title: "Dashboard",
-        url: "/",
-        icon: Droplets,
-    },
-    {
-        title: "Motors & Sensors",
-        url: "/motors",
-        icon: Gauge,
-    },
-    {
-        title: "Farm Map",
-        url: "/map",
-        icon: MapIcon,
-    },
-    {
-        title: "Smart Schedule",
-        url: "/schedule",
-        icon: CalendarRange,
-    },
-    {
-        title: "AI Analytics",
-        url: "/analytics",
-        icon: BrainCircuit,
-    },
-    {
-        title: "Device Fleet",
-        url: "/devices",
-        icon: Router,
-    },
-    {
-        title: "Settings",
-        url: "#",
-        icon: Settings,
-    },
-]
+export function AppSidebar({ locale: initialLocale }: { locale?: string }) {
+    const t = useTranslations("nav");
+    const locale = initialLocale || useLocale();
 
-export function AppSidebar() {
+    const items = [
+        { titleKey: "dashboard", url: `/${locale}`, icon: Droplets },
+        { titleKey: "motors", url: `/${locale}/motors`, icon: Gauge },
+        { titleKey: "map", url: `/${locale}/map`, icon: MapIcon },
+        { titleKey: "schedule", url: `/${locale}/schedule`, icon: CalendarRange },
+        { titleKey: "analytics", url: `/${locale}/analytics`, icon: BrainCircuit },
+        { titleKey: "devices", url: `/${locale}/devices`, icon: Router },
+        { titleKey: "settings", url: "#", icon: Settings },
+    ] as const;
+
+    const sidebarSide = locale === "ar" ? "right" : "left";
+    const iconSpacing = locale === "ar" ? "ml-2" : "mr-2";
+
     return (
-        <Sidebar>
+        <Sidebar side={sidebarSide}>
             <SidebarContent>
                 <SidebarGroup>
                     <div className="flex items-center p-4">
-                        <Droplets className="w-6 h-6 text-green-600 mr-2" />
+                        <Droplets className={`w-6 h-6 text-green-600 ${iconSpacing}`} />
                         <span className="font-bold text-lg text-green-900">AgriFlow</span>
                     </div>
-                    <SidebarGroupLabel>Menu</SidebarGroupLabel>
+                    <SidebarGroupLabel>{t("menu")}</SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>
                             {items.map((item) => (
-                                <SidebarMenuItem key={item.title}>
+                                <SidebarMenuItem key={item.titleKey}>
                                     <SidebarMenuButton asChild>
                                         <a href={item.url}>
                                             <item.icon />
-                                            <span>{item.title}</span>
+                                            <span>{t(item.titleKey)}</span>
                                         </a>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
@@ -75,5 +56,5 @@ export function AppSidebar() {
                 </SidebarGroup>
             </SidebarContent>
         </Sidebar>
-    )
+    );
 }

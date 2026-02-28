@@ -5,12 +5,23 @@ from __future__ import annotations
 
 import os
 import numpy as np
-import torch
 from typing import Optional, List
 
+# ── Optional torch ────────────────────────────────────────────────────────────
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    torch = None  # type: ignore
+    TORCH_AVAILABLE = False
+    print("⚠️  torch not installed — AI service running in stub mode.")
+
 from app.config import MODEL_DIR, FEATURE_COLS, SEQUENCE_LENGTH, NUM_FEATURES
-from app.models.rnn_model import IrrigationRNN, create_rnn_model
-from app.models.lstm_model import IrrigationLSTM, AttentionLSTM, create_lstm_model
+
+# ── Optional model imports (also depend on torch) ─────────────────────────────
+if TORCH_AVAILABLE:
+    from app.models.rnn_model import IrrigationRNN, create_rnn_model
+    from app.models.lstm_model import IrrigationLSTM, AttentionLSTM, create_lstm_model
 
 
 class AIService:
@@ -20,13 +31,19 @@ class AIService:
 
     def __init__(self):
         self.models = {}           # name → nn.Module
-        self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(f"🤖 AI device: {self._device}")
+        if TORCH_AVAILABLE:
+            self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            print(f"🤖 AI device: {self._device}")
+        else:
+            self._device = "cpu"
 
     # ── Model lifecycle ───────────────────────────────
 
     def init_default_models(self):
         """Create default template models (untrained)."""
+        if not TORCH_AVAILABLE:
+            print("⚠️  Skipping model initialisation — torch not available.")
+            return
         self.models["rnn_anomaly"] = create_rnn_model(
             num_features=NUM_FEATURES,
             mode="anomaly",
@@ -89,7 +106,6 @@ class AIService:
 
     # ── Inference ─────────────────────────────────────
 
-    @torch.no_grad()
     def predict(
         self,
         model_name: str,
@@ -106,6 +122,8 @@ class AIService:
         Returns:
             dict with prediction results
         """
+        if not TORCH_AVAILABLE:
+            return {"error": "torch not installed — inference unavailable in stub mode."}
         if model_name not in self.models:
             return {"error": f"Model '{model_name}' not found. Available: {list(self.models.keys())}"}
 
@@ -176,6 +194,8 @@ class AIService:
 
     def save_model(self, model_name: str) -> str:
         """Save model weights to disk."""
+        if not TORCH_AVAILABLE:
+            raise RuntimeError("torch not installed — cannot save models.")
         if model_name not in self.models:
             raise ValueError(f"Model '{model_name}' not found")
 
@@ -187,6 +207,8 @@ class AIService:
 
     def load_model(self, model_name: str) -> bool:
         """Load saved weights into an existing model."""
+        if not TORCH_AVAILABLE:
+            return False
         path = MODEL_DIR / f"{model_name}.pt"
         if not path.exists():
             print(f"⚠ No saved weights at: {path}")

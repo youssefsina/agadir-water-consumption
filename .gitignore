@@ -12,3 +12,6 @@ __pycache__/
 venv/
 env/
 .venv/
+
+# Local launcher script
+start.bat
