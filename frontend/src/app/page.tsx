@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
 import {
   Area,
   AreaChart,
@@ -34,8 +35,18 @@ import {
   Clock,
   ArrowUpRight,
   ArrowDownRight,
-  Settings
+  Settings,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
+import {
+  getHealth,
+  getDataBatch,
+  getWsSensorsUrl,
+  getWsAlertsUrl,
+  backendRowToSensorData,
+  type BackendSensorRow,
+} from "@/lib/api";
 
 type Scenario = "NORMAL" | "LEAK_NIGHT" | "BURST" | "OVER_IRR" | "UNDER_IRR" | "RAIN";
 type DecisionState = "ON" | "PAUSE" | "STOP";
@@ -62,16 +73,98 @@ export default function Dashboard() {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [currentData, setCurrentData] = useState<SensorData>({
     time: "10:00",
-    flow: 120, // L/hr
-    pressure: 2.5, // Bar
-    moisture: 45, // %
-    temperature: 24, // C
+    flow: 120,
+    pressure: 2.5,
+    moisture: 45,
+    temperature: 24,
     anomalyScore: 5,
   });
   const [history, setHistory] = useState<SensorData[]>([]);
+  const [useLiveApi, setUseLiveApi] = useState(false);
+  const [apiConnected, setApiConnected] = useState<boolean | null>(null);
+  const wsSensorsRef = useRef<WebSocket | null>(null);
+  const wsAlertsRef = useRef<WebSocket | null>(null);
 
-  // Simulation loop
+  // Live API: WebSocket streams for sensors + alerts
   useEffect(() => {
+    if (!useLiveApi) {
+      setApiConnected(null);
+      return;
+    }
+    let cancelled = false;
+    setApiConnected(null);
+
+    getHealth()
+      .then(() => {
+        if (cancelled) return;
+        setApiConnected(true);
+        // Seed history from REST
+        getDataBatch({ start: 0, size: 30, dataset: "raw" })
+          .then((res) => {
+            if (cancelled) return;
+            const mapped = (res.data || []).map((r: BackendSensorRow) => backendRowToSensorData(r));
+            if (mapped.length) {
+              setHistory(mapped);
+              setCurrentData(mapped[mapped.length - 1]!);
+            }
+          })
+          .catch(() => {});
+
+        const sensorsUrl = getWsSensorsUrl({ speed: 800, batch: 1 });
+        const wsSensors = new WebSocket(sensorsUrl);
+        wsSensorsRef.current = wsSensors;
+        wsSensors.onmessage = (e) => {
+          try {
+            const msg = JSON.parse(e.data as string);
+            if (msg.type === "sensor_data" && Array.isArray(msg.data) && msg.data.length > 0) {
+              const next = msg.data.map((r: BackendSensorRow) => backendRowToSensorData(r));
+              setCurrentData(next[next.length - 1]!);
+              setHistory((prev) => [...prev.slice(-50), ...next].slice(-50));
+            }
+          } catch (_) {}
+        };
+        wsSensors.onerror = () => setApiConnected(false);
+        wsSensors.onclose = () => { wsSensorsRef.current = null; };
+
+        const alertsUrl = getWsAlertsUrl({ speed: 300 });
+        const wsAlerts = new WebSocket(alertsUrl);
+        wsAlertsRef.current = wsAlerts;
+        wsAlerts.onmessage = (e) => {
+          try {
+            const msg = JSON.parse(e.data as string);
+            if (msg.type === "anomaly_alert" && msg.alert) {
+              const row = msg.alert as BackendSensorRow;
+              const label = row.anomaly_type || "Anomaly";
+              setAlerts((prev) => [
+                { id: Math.random().toString(36).slice(2, 9), time: new Date().toLocaleTimeString(), message: `${label}: flow ${row.flow_lpm?.toFixed(1)} L/min, pressure ${row.pressure_bar?.toFixed(2)} bar`, type: "destructive" as const },
+                ...prev.slice(0, 9),
+              ]);
+            }
+          } catch (_) {}
+        };
+        wsAlerts.onerror = () => {};
+        wsAlerts.onclose = () => { wsAlertsRef.current = null; };
+      })
+      .catch(() => {
+        if (!cancelled) setApiConnected(false);
+      });
+
+    return () => {
+      cancelled = true;
+      if (wsSensorsRef.current) {
+        wsSensorsRef.current.close();
+        wsSensorsRef.current = null;
+      }
+      if (wsAlertsRef.current) {
+        wsAlertsRef.current.close();
+        wsAlertsRef.current = null;
+      }
+    };
+  }, [useLiveApi]);
+
+  // Simulation loop (only when not using live API)
+  useEffect(() => {
+    if (useLiveApi) return;
     // Generate initial history
     if (history.length === 0) {
       const initialHistory = [];
@@ -169,7 +262,7 @@ export default function Dashboard() {
     }, 2000); // update every 2 seconds
 
     return () => clearInterval(interval);
-  }, [scenario, currentData.moisture, decision, history.length]);
+  }, [useLiveApi, scenario, currentData.moisture, decision, history.length]);
 
   const addAlert = (message: string, type: "warning" | "destructive" | "info") => {
     setAlerts((prev) => {
@@ -226,6 +319,31 @@ export default function Dashboard() {
               <Settings className="w-4 h-4" />
               Scenario Simulator (Debug)
             </CardTitle>
+            <div className="flex items-center gap-3 flex-wrap mt-2 text-sm text-green-700">
+              <span className="flex items-center gap-2">
+                <Switch
+                  id="live-api"
+                  checked={useLiveApi}
+                  onCheckedChange={setUseLiveApi}
+                />
+                <label htmlFor="live-api" className="font-medium cursor-pointer">
+                  Live from API
+                </label>
+              </span>
+              {useLiveApi && (
+                apiConnected === true ? (
+                  <Badge className="bg-green-100 text-green-800 border-green-200">
+                    <Wifi className="w-3 h-3 mr-1" /> Connected
+                  </Badge>
+                ) : apiConnected === false ? (
+                  <Badge variant="secondary" className="bg-red-100 text-red-800 border-red-200">
+                    <WifiOff className="w-3 h-3 mr-1" /> Backend unreachable
+                  </Badge>
+                ) : (
+                  <Badge variant="outline">Connecting…</Badge>
+                )
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
@@ -336,7 +454,7 @@ export default function Dashboard() {
           <Card className="lg:col-span-2 border-green-200 shadow-sm">
             <CardHeader>
               <CardTitle className="text-green-800">Flow & Pressure History</CardTitle>
-              <CardDescription>Real-time mock sensor data visualization</CardDescription>
+              <CardDescription>{useLiveApi && apiConnected ? "Live data from backend API" : "Real-time sensor data visualization"}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="h-[300px] w-full mt-4">

@@ -1,8 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BrainCircuit, Droplet, CircleDollarSign, TrendingDown, Target, Zap, AlertCircle } from "lucide-react";
+import { BrainCircuit, Droplet, CircleDollarSign, TrendingDown, Target, Zap, AlertCircle, Loader2 } from "lucide-react";
 import {
     ScatterChart,
     Scatter,
@@ -14,36 +15,77 @@ import {
     ResponsiveContainer,
     Legend
 } from 'recharts';
+import { getDataQuery, getAIModels, type BackendSensorRow } from "@/lib/api";
+
+type ScatterPoint = { x: number; y: number; z: number };
+
+function useAnalyticsData() {
+    const [normal, setNormal] = useState<ScatterPoint[]>([]);
+    const [leaks, setLeaks] = useState<ScatterPoint[]>([]);
+    const [clogs, setClogs] = useState<ScatterPoint[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        setLoading(true);
+        setError(null);
+        Promise.all([
+            getDataQuery({ dataset: "raw", limit: 500, anomaly_type: "Normal" }),
+            getDataQuery({ dataset: "raw", limit: 200, anomaly_type: "Night_Leak" }).catch(() => ({ data: [] as BackendSensorRow[] })),
+            getDataQuery({ dataset: "raw", limit: 200, anomaly_type: "Pipe_Burst" }).catch(() => ({ data: [] as BackendSensorRow[] })),
+            getDataQuery({ dataset: "raw", limit: 200, anomaly_type: "Under_Irrigation" }).catch(() => ({ data: [] as BackendSensorRow[] })),
+            getDataQuery({ dataset: "raw", limit: 200, anomaly_type: "Over_Irrigation" }).catch(() => ({ data: [] as BackendSensorRow[] })),
+        ])
+            .then(([normRes, leakRes, burstRes, underRes, overRes]) => {
+                const toPoint = (r: BackendSensorRow) => ({
+                    x: Number(r.flow_lpm) || 0,
+                    y: Number(r.pressure_bar) || 0,
+                    z: r.anomaly_type && r.anomaly_type !== "Normal" ? 70 + Math.random() * 25 : 5 + Math.random() * 20,
+                });
+                setNormal((normRes.data || []).slice(0, 80).map(toPoint));
+                const leakLike = [...(leakRes.data || []), ...(burstRes.data || [])].map(toPoint);
+                setLeaks(leakLike.slice(0, 40));
+                const clogLike = [...(underRes.data || []), ...(overRes.data || [])].map(toPoint);
+                setClogs(clogLike.slice(0, 30));
+            })
+            .catch((e) => setError(e?.message || "Failed to load data"))
+            .finally(() => setLoading(false));
+    }, []);
+
+    return { normal, leaks, clogs, loading, error };
+}
 
 export default function AnalyticsPage() {
-    // Mock data for Isolation Forest Visualization
-    // Normal cluster around low anomaly score, tight flow/pressure relationship
-    // Outliers (Leaks) with high flow, low pressure, high anomaly score
-    // Outliers (Clogs) with low flow, high pressure, high anomaly score
+    const { normal, leaks, clogs, loading, error } = useAnalyticsData();
+    const [models, setModels] = useState<{ name: string; parameters: number }[]>([]);
+    const [modelsLoading, setModelsLoading] = useState(true);
 
-    const generateData = () => {
-        const normal = Array.from({ length: 50 }, () => ({
-            x: 100 + (Math.random() - 0.5) * 20, // Flow (L/min)
-            y: 2.5 + (Math.random() - 0.5) * 0.4, // Pressure (Bar)
-            z: 5 + Math.random() * 15,          // Anomaly Score
-        }));
+    useEffect(() => {
+        getAIModels()
+            .then((res) => {
+                setModels(res.models || []);
+            })
+            .catch(() => setModels([]))
+            .finally(() => setModelsLoading(false));
+    }, []);
 
-        const leaks = Array.from({ length: 15 }, () => ({
-            x: 180 + Math.random() * 50,         // High Flow
-            y: 1.0 + Math.random() * 0.8,         // Low Pressure
-            z: 80 + Math.random() * 20,          // High Anomaly
-        }));
-
-        const clogs = Array.from({ length: 10 }, () => ({
-            x: 20 + Math.random() * 30,          // Low Flow
-            y: 3.5 + Math.random() * 0.5,         // High Pressure
-            z: 75 + Math.random() * 20,          // High Anomaly
-        }));
-
-        return { normal, leaks, clogs };
-    };
-
-    const { normal, leaks, clogs } = generateData();
+    // Fallback mock data when API fails or returns empty
+    const hasData = normal.length > 0 || leaks.length > 0 || clogs.length > 0;
+    const normalPoints = hasData ? normal : Array.from({ length: 50 }, () => ({
+        x: 100 + (Math.random() - 0.5) * 20,
+        y: 2.5 + (Math.random() - 0.5) * 0.4,
+        z: 5 + Math.random() * 15,
+    }));
+    const leakPoints = hasData ? leaks : Array.from({ length: 15 }, () => ({
+        x: 180 + Math.random() * 50,
+        y: 1.0 + Math.random() * 0.8,
+        z: 80 + Math.random() * 20,
+    }));
+    const clogPoints = hasData ? clogs : Array.from({ length: 10 }, () => ({
+        x: 20 + Math.random() * 30,
+        y: 3.5 + Math.random() * 0.5,
+        z: 75 + Math.random() * 20,
+    }));
 
     return (
         <div className="min-h-screen bg-green-50/50 p-4 md:p-8 font-sans text-green-950">
@@ -54,8 +96,13 @@ export default function AnalyticsPage() {
                             <BrainCircuit className="w-8 h-8 text-indigo-600" />
                             AI Performance Analytics
                         </h1>
-                        <p className="text-green-700/80 mt-1">Isolation Forest anomaly detection model visualization and ROI tracking</p>
+                        <p className="text-green-700/80 mt-1">Anomaly detection model visualization and ROI tracking {hasData && "(data from API)"}</p>
                     </div>
+                    {error && (
+                        <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200">
+                            {error}
+                        </Badge>
+                    )}
                 </div>
 
                 {/* Wow Factor Hero Counters */}
@@ -133,7 +180,12 @@ export default function AnalyticsPage() {
                                 </CardDescription>
                             </div>
                         </CardHeader>
-                        <CardContent className="pt-6">
+                        <CardContent className="pt-6 relative">
+                            {loading && (
+                                <div className="absolute inset-0 bg-white/70 z-10 flex items-center justify-center rounded-lg">
+                                    <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                                </div>
+                            )}
                             <div className="h-[400px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 0 }}>
@@ -146,9 +198,9 @@ export default function AnalyticsPage() {
                                         <Tooltip cursor={{ strokeDasharray: '3 3' }}
                                             contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', padding: '12px' }} />
                                         <Legend verticalAlign="top" height={36} />
-                                        <Scatter name="Normal Operations (Inliers)" data={normal} fill="#10b981" fillOpacity={0.6} />
-                                        <Scatter name="Leak Anomalies (Outliers)" data={leaks} fill="#ef4444" fillOpacity={0.8} />
-                                        <Scatter name="Clog/Valve Anomalies (Outliers)" data={clogs} fill="#f59e0b" fillOpacity={0.8} />
+                                        <Scatter name="Normal Operations (Inliers)" data={normalPoints} fill="#10b981" fillOpacity={0.6} />
+                                        <Scatter name="Leak Anomalies (Outliers)" data={leakPoints} fill="#ef4444" fillOpacity={0.8} />
+                                        <Scatter name="Clog/Valve Anomalies (Outliers)" data={clogPoints} fill="#f59e0b" fillOpacity={0.8} />
                                     </ScatterChart>
                                 </ResponsiveContainer>
                             </div>
@@ -176,15 +228,23 @@ export default function AnalyticsPage() {
                                     <p className="text-xs">Leaks or clogs result in rare value combinations (e.g., high flow with low pressure). They are susceptible to isolation and are detected quickly near the root of the tree.</p>
                                 </div>
                                 <div className="mt-4 pt-4 border-t border-indigo-100">
-                                    <div className="text-xs font-semibold text-indigo-900 mb-2 uppercase tracking-wide">Current Model Status</div>
-                                    <div className="flex justify-between items-center mb-1">
-                                        <span className="text-xs font-medium">Contamination Parameter</span>
-                                        <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200">Auto (0.05)</Badge>
+                                    <div className="text-xs font-semibold text-indigo-900 mb-2 uppercase tracking-wide">
+                                        Loaded models {modelsLoading && "(loading…)"}
                                     </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-xs font-medium">Training Data Horizon</span>
-                                        <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200">Rolling 30-Day</Badge>
-                                    </div>
+                                    {models.length > 0 ? (
+                                        <ul className="space-y-1.5 text-xs">
+                                            {models.map((m) => (
+                                                <li key={m.name} className="flex justify-between items-center gap-2">
+                                                    <span className="font-medium text-indigo-800 truncate">{m.name}</span>
+                                                    <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 shrink-0">
+                                                        {(m.parameters / 1000).toFixed(1)}k params
+                                                    </Badge>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <p className="text-xs text-indigo-600">No models from API. Start backend to see RNN/LSTM models.</p>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>

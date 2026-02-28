@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Router, Radio, Activity, Battery, BatteryMedium, BatteryFull, BatteryWarning, Wifi, WifiOff, AlertTriangle, RefreshCw } from "lucide-react";
+import { Router, Radio, Activity, Battery, BatteryMedium, BatteryFull, BatteryWarning, Wifi, WifiOff, AlertTriangle, RefreshCw, Loader2 } from "lucide-react";
+import { getWebhookEvents, getHealth, type WebhookEvent } from "@/lib/api";
 
 type DeviceStatus = "online" | "offline" | "warning";
 type DeviceType = "Gateway" | "Flow Meter" | "Pressure Sensor" | "Soil Node";
@@ -20,6 +22,34 @@ interface Device {
 }
 
 export default function DevicesPage() {
+   const [webhookEvents, setWebhookEvents] = useState<WebhookEvent[]>([]);
+   const [eventsLoading, setEventsLoading] = useState(true);
+   const [apiHealthy, setApiHealthy] = useState<boolean | null>(null);
+
+   const fetchEvents = () => {
+      setEventsLoading(true);
+      getWebhookEvents({ limit: 20 })
+         .then((res) => setWebhookEvents(res.events || []))
+         .catch(() => setWebhookEvents([]))
+         .finally(() => setEventsLoading(false));
+   };
+
+   useEffect(() => {
+      getHealth()
+         .then(() => setApiHealthy(true))
+         .catch(() => setApiHealthy(false));
+   }, []);
+
+   useEffect(() => {
+      if (apiHealthy !== true) {
+         setEventsLoading(false);
+         return;
+      }
+      fetchEvents();
+      const t = setInterval(fetchEvents, 15000);
+      return () => clearInterval(t);
+   }, [apiHealthy]);
+
    const devices: Device[] = [
       { id: "GW-MSTR-01", name: "Main LoRaWAN Gateway", type: "Gateway", status: "online", battery: 100, signal: -20, lastSeen: "2 mins ago", firmware: "v2.1.0" },
       { id: "FM-NTH-12", name: "North Field Flow", type: "Flow Meter", status: "online", battery: 85, signal: -50, lastSeen: "5 mins ago", firmware: "v1.4.2" },
@@ -74,8 +104,14 @@ export default function DevicesPage() {
                   <p className="text-green-700/80 mt-1">Manage field sensors, gateways, and communication links</p>
                </div>
 
-               <Button variant="outline" className="border-green-200 text-green-700 shadow-sm">
-                  <RefreshCw className="w-4 h-4 mr-2" /> Ping All Devices
+               <Button
+                  variant="outline"
+                  className="border-green-200 text-green-700 shadow-sm"
+                  onClick={() => apiHealthy === true && fetchEvents()}
+                  disabled={eventsLoading || apiHealthy !== true}
+               >
+                  {eventsLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                  {apiHealthy === true ? "Refresh events" : "Backend offline"}
                </Button>
             </div>
 
@@ -192,7 +228,49 @@ export default function DevicesPage() {
                   </table>
                </div>
             </Card>
-         </div >
-      </div >
+
+            {/* Recent webhook events from backend API */}
+            <Card className="border-green-200 shadow-sm bg-white overflow-hidden">
+               <CardHeader className="pb-3 border-b border-green-100 bg-green-50/50">
+                  <div className="flex items-center justify-between">
+                     <div>
+                        <CardTitle className="text-green-800">Recent webhook events (API)</CardTitle>
+                        <CardDescription>
+                           Ingest events from POST /webhook/ingest. {apiHealthy === true ? "Backend connected." : apiHealthy === false ? "Backend unreachable." : "Checking…"}
+                        </CardDescription>
+                     </div>
+                     <Button variant="outline" size="sm" onClick={fetchEvents} disabled={eventsLoading || apiHealthy !== true}>
+                        {eventsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                     </Button>
+                  </div>
+               </CardHeader>
+               <CardContent className="p-0">
+                  {apiHealthy !== true ? (
+                     <div className="p-6 text-center text-sm text-slate-500">
+                        Start the backend and open this page to see webhook events here.
+                     </div>
+                  ) : webhookEvents.length === 0 ? (
+                     <div className="p-6 text-center text-sm text-slate-500">
+                        No events yet. Send data to POST /webhook/ingest to see entries.
+                     </div>
+                  ) : (
+                     <div className="divide-y divide-green-50 max-h-[300px] overflow-y-auto">
+                        {webhookEvents.map((evt, i) => (
+                           <div key={evt.event_id ?? i} className="px-6 py-3 flex items-center gap-4 text-sm">
+                              <Badge variant="outline" className="shrink-0 font-mono text-xs">
+                                 {evt.event_type ?? "—"}
+                              </Badge>
+                              <span className="text-green-800 font-medium truncate">{evt.device_id ?? "—"}</span>
+                              <span className="text-slate-500 text-xs shrink-0">
+                                 {evt.received_at ? new Date(evt.received_at).toLocaleString() : evt.timestamp ?? "—"}
+                              </span>
+                           </div>
+                        ))}
+                     </div>
+                  )}
+               </CardContent>
+            </Card>
+         </div>
+      </div>
    );
 }
