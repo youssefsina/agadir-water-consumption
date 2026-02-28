@@ -1,0 +1,168 @@
+hackathon project
+The Idea
+We are building an AI-powered smart irrigation monitoring and leak detection
+system for farmers.
+The system uses sensor data (flow, pressure, soil moisture, and weather
+information) to:
+Detect early water leaks
+Identify pipe bursts or blockages
+Detect over-irrigation and under-irrigation
+Automatically pause irrigation when rain is expected
+Optimize irrigation based on soil moisture and temperature
+The goal is to reduce water waste, lower energy costs, and improve crop health
+using artificial intelligence.
+The Problem
+Agriculture consumes the majority of freshwater resources. However, many farms
+still rely on manual irrigation or fixed schedules.
+This leads to:
+Undetected water leaks in irrigation pipelines
+Over-irrigation that wastes water and damages crops
+Under-irrigation that reduces yield
+Irrigation running before rainfall
+Increased electricity costs from unnecessary pump usage
+Farmers usually detect these problems too late — after water loss or crop stress
+has already occurred.
+hackathon project
+1
+
+There is a need for an intelligent, automated monitoring system.
+Real-World Use (Production System)
+Devices Needed
+1. Flow Meter
+Installed after the irrigation pump on the main pipeline.
+Measures water flow (liters per minute).
+2. Pressure Sensor
+Installed on the irrigation pipe.
+Detects pressure drops or abnormal pressure patterns.
+3. Soil Moisture Sensor
+Installed in the soil near crops.
+Measures how wet or dry the soil is.
+4. Temperature Sensor
+Measures ambient temperature.
+Used to estimate evaporation and irrigation needs.
+5. Weather Data
+From:
+Weather API (using farm GPS coordinates)
+OR
+On-site rain sensor
+6. IoT Controller
+Example:
+hackathon project
+2
+
+ESP32
+Industrial IoT gateway
+Collects sensor data and sends it to the cloud using:
+GSM / NB]IoT / LoRaWAN
+Real-World Architecture
+Sensors → IoT Device → Cloud Server → AI Engine → Dashboard + Alerts →
+Pump/Valve Control
+If rain is predicted or soil is already wet:
+→ System sends STOP command to pump relay or closes solenoid valve.
+Farmers always have manual override.
+Hackathon Implementation (Prototype)
+Since we cannot access real farm hardware, we simulate the entire system.
+Data Simulation
+We generate time-series data representing:
+Flow readings every 5 minutes
+Pressure readings
+Soil moisture percentage
+Temperature curve
+Rain forecast probability
+We simulate realistic irrigation behavior:
+Irrigation runs morning and evening
+Stable flow during irrigation
+Zero flow at night
+hackathon project
+3
+
+Soil moisture increases during irrigation
+Temperature follows daily cycle
+We inject anomalies:
+Leak at night (flow when irrigation is OFFM
+Burst (flow spike + pressure drop)
+Over-irrigation (long duration)
+Under-irrigation (scheduled ON but no flow)
+Rain forecast event
+AI Model & Training
+We use anomaly detection.
+Model: Isolation Forest LScikit-learn)
+Why anomaly detection?
+Because leaks and abnormal irrigation are rare events.
+Training Process
+Step 1o Use only normal operation data
+Step 2o Extract features:
+Flow
+Pressure
+Hour of day
+Rolling mean
+Rolling deviation
+Step 3o Train model on normal data
+Step 4o Use model to score new incoming readings
+If anomaly score exceeds threshold:
+hackathon project
+4
+
+→ Flag as abnormal behavior
+Decision Engine (Rules Layer)
+On top of AI, we add agricultural rules:
+Weather Rule:
+If rain probability > 60% and expected rainfall > 2mm
+→ Pause irrigation
+Soil Rule:
+If soil moisture > 60%
+→ Stop irrigation
+If soil moisture < 25% and no rain predicted
+→ Allow irrigation
+Over-Irrigation Rule:
+If irrigation duration exceeds historical baseline
+→ Alert
+Under-Irrigation Rule:
+If scheduled ON but flow ≈ 0
+→ Pump or valve issue alert
+Dashboard (What We Show)
+Real-time sensor values
+Flow and pressure graphs
+Anomaly score visualization
+Alert list
+Current irrigation decision LON / PAUSE / STOPM
+This demonstrates full system functionality.
+hackathon project
+5
+
+Data Sources
+For hackathon:
+Synthetic dataset based on documented irrigation practices
+Agricultural water usage patterns
+Weather simulation or API
+Research-based typical irrigation schedules
+For real deployment:
+IoT flow meter data
+Pressure sensor data
+Soil moisture sensor data
+Weather API or rain sensor
+Pitch Script
+Water scarcity is one of the biggest challenges in agriculture. Farmers lose water
+and money due to undetected irrigation leaks, over-irrigation, and poor adaptation
+to weather conditions.
+We built an AI-powered smart irrigation monitoring system that learns normal
+irrigation behavior and detects abnormal patterns in real time.
+Using simulated sensor data from flow meters, pressure sensors, soil moisture
+sensors, and weather forecasts, our system can:
+Detect early pipeline leaks
+Identify over and under irrigation
+Pause irrigation when rain is predicted
+Optimize watering based on soil conditions
+The system combines machine learning using Isolation Forest with intelligent
+agricultural decision rules.
+hackathon project
+6
+
+Our prototype demonstrates how AI and IoT can transform traditional irrigation
+into an intelligent, adaptive, and sustainable water management system for
+farmers.
+Our long-term vision is to deploy this solution on real farms using affordable IoT
+devices and cloud-based analytics to reduce water waste and improve crop
+productivity.
+hackathon project
+7
