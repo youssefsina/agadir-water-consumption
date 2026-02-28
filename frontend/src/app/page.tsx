@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -36,6 +36,8 @@ import {
   ArrowDownRight,
   Settings
 } from "lucide-react";
+import { api } from "@/lib/api";
+import type { PipelineHistoryEntry } from "@/types/api";
 
 type Scenario = "NORMAL" | "LEAK_NIGHT" | "BURST" | "OVER_IRR" | "UNDER_IRR" | "RAIN";
 type DecisionState = "ON" | "PAUSE" | "STOP";
@@ -56,96 +58,47 @@ interface SensorData {
   anomalyScore: number;
 }
 
+/** Map backend pipeline entry (REST or WS) to dashboard SensorData. */
+function mapPipelineEntryToSensorData(d: PipelineHistoryEntry): SensorData {
+  const { sensor_data, prediction } = d;
+  return {
+    time: new Date(d.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    flow: sensor_data.flow_lpm,
+    pressure: sensor_data.pressure_bar,
+    moisture: sensor_data.soil_moisture_pct,
+    temperature: sensor_data.temperature_c,
+    anomalyScore: prediction.is_anomaly ? prediction.confidence * 100 : Math.max(5, prediction.confidence * 20),
+  };
+}
+
+const DEFAULT_SENSOR_DATA: SensorData = {
+  time: "—",
+  flow: 0,
+  pressure: 0,
+  moisture: 0,
+  temperature: 0,
+  anomalyScore: 0,
+};
+
 export default function Dashboard() {
   const [scenario, setScenario] = useState<Scenario>("NORMAL");
   const [decision, setDecision] = useState<DecisionState>("ON");
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
-  const [currentData, setCurrentData] = useState<SensorData>({
-    time: "10:00",
-    flow: 120, // L/hr
-    pressure: 2.5, // Bar
-    moisture: 45, // %
-    temperature: 24, // C
-    anomalyScore: 5,
-  });
+  const [currentData, setCurrentData] = useState<SensorData>(DEFAULT_SENSOR_DATA);
   const [history, setHistory] = useState<SensorData[]>([]);
+  const [apiConnected, setApiConnected] = useState<boolean | null>(null);
+  console.log("data: ", currentData)
+  console.log("history: ", history)
+  console.log("apiConnected: ", apiConnected)
+  console.log("scenario: ", scenario)
+  console.log("decision: ", decision)
+  console.log("alerts: ", alerts)
+  console.log("currentData: ", currentData)
+  console.log("history: ", history)
+  console.log("apiConnected: ", apiConnected)
 
-  // Real-time backend connection
-  useEffect(() => {
-    const ws = new WebSocket("ws://127.0.0.1:8000/pipeline/ws");
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === "pipeline_tick") {
-          const { timestamp, sensor_data, prediction } = data;
-          const newData = {
-            time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-            flow: sensor_data.flow_lpm,
-            pressure: sensor_data.pressure_bar,
-            moisture: sensor_data.soil_moisture_pct,
-            temperature: sensor_data.temperature_c,
-            anomalyScore: prediction.is_anomaly ? prediction.confidence * 100 : Math.max(5, prediction.confidence * 20),
-          };
-
-          if (sensor_data.is_irrigating) {
-            setDecision("ON");
-          } else if (sensor_data.rain_probability > 0.6) {
-            setDecision("PAUSE");
-          } else {
-            setDecision("STOP");
-          }
-
-          setCurrentData(newData);
-          setHistory((prev) => [...prev.slice(-20), newData]); // keep last 20 points
-
-          if (prediction.is_anomaly) {
-            const anType = prediction.anomaly_type || "Unknown Anomaly";
-            addAlert(`${anType} detected! Confidence: ${(prediction.confidence * 100).toFixed(0)}%`, "destructive");
-          }
-        } else if (data.type === "history") {
-          const h = data.data.map((d: any) => ({
-            time: new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-            flow: d.sensor_data.flow_lpm,
-            pressure: d.sensor_data.pressure_bar,
-            moisture: d.sensor_data.soil_moisture_pct,
-            temperature: d.sensor_data.temperature_c,
-            anomalyScore: d.prediction.is_anomaly ? d.prediction.confidence * 100 : Math.max(5, d.prediction.confidence * 20),
-          }));
-
-          if (h.length > 0) {
-            setHistory(h.slice(-20)); // keep last 20 points from history
-            setCurrentData(h[h.length - 1]);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to parse websocket message", err);
-      }
-    };
-
-    ws.onerror = (err) => {
-      console.error("WebSocket error", err);
-    };
-
-    return () => {
-      ws.close();
-    };
-  }, []);
-
-  const handleSetScenario = async (scen: Scenario, anomalyId: number) => {
-    setScenario(scen);
-    try {
-      await fetch(`http://127.0.0.1:8000/pipeline/set-anomaly?anomaly_type=${anomalyId}`, {
-        method: 'POST',
-      });
-    } catch (e) {
-      console.error("Failed to set scenario", e);
-    }
-  };
-
-  const addAlert = (message: string, type: "warning" | "destructive" | "info") => {
+  const addAlert = useCallback((message: string, type: "warning" | "destructive" | "info") => {
     setAlerts((prev) => {
-      // prevent spamming the exact same message every 2 seconds
       if (prev.length > 0 && prev[0].message === message) return prev;
       return [
         {
@@ -154,9 +107,93 @@ export default function Dashboard() {
           message,
           type,
         },
-        ...prev.slice(0, 9), // keep last 10
+        ...prev.slice(0, 9),
       ];
     });
+  }, []);
+
+  // Initial data from REST API — single dashboard/init call (status + history)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.dashboard.init(50);
+        if (cancelled) return;
+        const data = res.history?.data ?? [];
+        if (data.length > 0) {
+          const mapped = data.map(mapPipelineEntryToSensorData).slice(-20);
+          setHistory(mapped);
+          setCurrentData(mapped[mapped.length - 1] ?? DEFAULT_SENSOR_DATA);
+          const last = data[data.length - 1];
+          if (last?.sensor_data) {
+            const sd = last.sensor_data;
+            if (sd.is_irrigating) setDecision("ON");
+            else if ((sd.rain_probability ?? 0) > 0.6) setDecision("PAUSE");
+            else setDecision("STOP");
+          }
+        }
+        setApiConnected(true);
+      } catch (e) {
+        if (!cancelled) setApiConnected(false);
+        console.warn("Dashboard init failed (backend may be starting):", e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Real-time backend connection via WebSocket (dynamic URL from env)
+  useEffect(() => {
+    const wsUrl = api.getWsUrl("/pipeline/ws");
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "pipeline_tick") {
+          const entry: PipelineHistoryEntry = {
+            timestamp: data.timestamp,
+            sensor_data: data.sensor_data,
+            prediction: data.prediction,
+          };
+          const newData = mapPipelineEntryToSensorData(entry);
+
+          if (data.sensor_data.is_irrigating) setDecision("ON");
+          else if ((data.sensor_data.rain_probability ?? 0) > 0.6) setDecision("PAUSE");
+          else setDecision("STOP");
+
+          setCurrentData(newData);
+          setHistory((prev) => [...prev.slice(-20), newData]);
+          setApiConnected(true);
+
+          if (data.prediction?.is_anomaly) {
+            const anType = data.prediction.anomaly_type || "Unknown Anomaly";
+            addAlert(`${anType} detected! Confidence: ${(data.prediction.confidence * 100).toFixed(0)}%`, "destructive");
+          }
+        } else if (data.type === "history") {
+          const h = (data.data as PipelineHistoryEntry[]).map(mapPipelineEntryToSensorData);
+          if (h.length > 0) {
+            setHistory(h.slice(-20));
+            setCurrentData(h[h.length - 1]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to parse websocket message", err);
+      }
+    };
+
+    ws.onerror = () => console.error("WebSocket error");
+    ws.onopen = () => setApiConnected(true);
+
+    return () => ws.close();
+  }, [addAlert]);
+
+  const handleSetScenario = async (scen: Scenario, anomalyId: number) => {
+    setScenario(scen);
+    try {
+      await api.pipeline.setAnomaly(anomalyId);
+    } catch (e) {
+      console.error("Failed to set scenario", e);
+    }
   };
 
   const getAnomalyColor = (score: number) => {
@@ -177,7 +214,18 @@ export default function Dashboard() {
             </h1>
             <p className="text-green-700/80 mt-1">Smart irrigation & leak detection system</p>
           </div>
-          <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-green-100 shadow-sm">
+          <div className="flex items-center gap-3 flex-wrap">
+            {apiConnected === true && (
+              <Badge variant="outline" className="border-green-300 text-green-700 bg-green-50 text-xs">
+                API connected
+              </Badge>
+            )}
+            {apiConnected === false && (
+              <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50 text-xs">
+                Connecting…
+              </Badge>
+            )}
+            <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-green-100 shadow-sm">
             <span className="text-sm font-medium text-green-800">System Status:</span>
             {decision === "ON" && (
               <Badge className="bg-green-500 hover:bg-green-600 px-3 py-1 text-sm"><Power className="w-4 h-4 mr-1" /> ON</Badge>
@@ -188,6 +236,7 @@ export default function Dashboard() {
             {decision === "STOP" && (
               <Badge variant="destructive" className="px-3 py-1 text-sm"><PowerOff className="w-4 h-4 mr-1" /> STOP</Badge>
             )}
+            </div>
           </div>
         </div>
 
