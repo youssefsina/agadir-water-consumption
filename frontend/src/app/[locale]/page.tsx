@@ -87,15 +87,6 @@ export default function Dashboard() {
   const [currentData, setCurrentData] = useState<SensorData>(DEFAULT_SENSOR_DATA);
   const [history, setHistory] = useState<SensorData[]>([]);
   const [apiConnected, setApiConnected] = useState<boolean | null>(null);
-  console.log("data: ", currentData)
-  console.log("history: ", history)
-  console.log("apiConnected: ", apiConnected)
-  console.log("scenario: ", scenario)
-  console.log("decision: ", decision)
-  console.log("alerts: ", alerts)
-  console.log("currentData: ", currentData)
-  console.log("history: ", history)
-  console.log("apiConnected: ", apiConnected)
 
   const addAlert = useCallback((message: string, type: "warning" | "destructive" | "info") => {
     setAlerts((prev) => {
@@ -215,7 +206,7 @@ export default function Dashboard() {
             <p className="text-green-700/80 mt-1">Smart irrigation & leak detection system</p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            {apiConnected === true && (
+            {/* {apiConnected === true && (
               <Badge variant="outline" className="border-green-300 text-green-700 bg-green-50 text-xs">
                 API connected
               </Badge>
@@ -224,7 +215,7 @@ export default function Dashboard() {
               <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50 text-xs">
                 Connecting…
               </Badge>
-            )}
+            )} */}
             <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-green-100 shadow-sm">
             <span className="text-sm font-medium text-green-800">System Status:</span>
             {decision === "ON" && (
