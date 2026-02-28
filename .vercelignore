@@ -1,0 +1,29 @@
+# Virtual environment directories
+backend/Lib/
+backend/Scripts/
+backend/Include/
+backend/share/
+backend/pyvenv.cfg
+
+# Large data/model files
+*.csv
+backend/model.pkl
+
+# Dev/training scripts
+backend/train_model.py
+backend/evaluate_model.py
+backend/simulation.py
+backend/dashboard.py
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+
+# Docs
+*.md
+idea.txt

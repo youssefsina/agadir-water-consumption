@@ -1,0 +1,18 @@
+{
+    "buildCommand": "cd frontend && npm run build",
+    "outputDirectory": "frontend/.next",
+    "installCommand": "cd frontend && npm install",
+    "framework": "nextjs",
+    "functions": {
+        "backend/**/*.py": {
+            "runtime": "@vercel/python@4.6.0",
+            "maxDuration": 30
+        }
+    },
+    "rewrites": [
+        {
+            "source": "/api/:path*",
+            "destination": "/backend/app/main.py"
+        }
+    ]
+}

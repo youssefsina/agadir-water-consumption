@@ -6,6 +6,16 @@ __pycache__/
 venv/
 .venv/
 
+# Backend virtualenv (created in backend/ root)
+backend/Lib/
+backend/Scripts/
+backend/Include/
+backend/share/
+backend/pyvenv.cfg
+
+# Large data files
+*.csv
+
 # Node
 node_modules/
 .next/
