@@ -7,9 +7,8 @@ backend/pyvenv.cfg
 
 # Large data/model files
 *.csv
-backend/model.pkl
 
-# Dev/training scripts
+# Dev/training scripts (not needed in production)
 backend/train_model.py
 backend/evaluate_model.py
 backend/simulation.py
@@ -24,6 +23,8 @@ Thumbs.db
 # Git
 .git/
 
-# Docs
-*.md
+# Docs & scripts
 idea.txt
+dev.bat
+start.bat
+supabase_setup.sql
