@@ -1,11 +1,9 @@
 fastapi==0.115.0
-requests==2.32.3
-uvicorn[standard]==0.30.6
-websockets>=13.0
+uvicorn==0.30.6
+websockets==13.0
 pydantic==2.9.2
 numpy==2.1.1
 pandas==2.2.2
 scikit-learn==1.5.2
-torch==2.4.1
-supabase
-python-dotenv
+python-dotenv==1.0.0
+supabase==2.0.0
