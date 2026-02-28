@@ -51,6 +51,14 @@ class WebhookResponse(BaseModel):
     event_id: Optional[str] = None
 
 
+# ── WhatsApp Notification ─────────────────────────────
+class WhatsAppSendRequest(BaseModel):
+    """Request body for sending WhatsApp notification."""
+    message: str = Field(..., min_length=1, max_length=4096, description="Text to send")
+    to: Optional[str] = Field(None, description="Single recipient phone (e.g. +212612345678)")
+    recipients: Optional[List[str]] = Field(None, description="List of recipient phones")
+
+
 # ── AI Prediction ─────────────────────────────────────
 class PredictionRequest(BaseModel):
     """Input sequence for AI model inference."""

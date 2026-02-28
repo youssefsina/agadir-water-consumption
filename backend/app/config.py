@@ -36,6 +36,19 @@ NUM_FEATURES = len(FEATURE_COLS)
 
 # ── Webhook ────────────────────────────────────────────
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "dev-secret-key-change-me")
+# WaSendAPI: secret from dashboard → Webhook settings (for X-Webhook-Signature verification)
+WASENDER_WEBHOOK_SECRET = os.getenv("WASENDER_WEBHOOK_SECRET", "")
+
+# ── WhatsApp (Cloud API) ──────────────────────────────
+# Get from Meta Developer Console: App → WhatsApp → API Setup
+WHATSAPP_ACCESS_TOKEN = os.getenv("WHATSAPP_ACCESS_TOKEN", "")
+WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
+# Default recipients for alerts (comma-separated, e.g. "212612345678,212698765432")
+WHATSAPP_DEFAULT_RECIPIENTS = [
+    p.strip()
+    for p in (os.getenv("WHATSAPP_DEFAULT_RECIPIENTS", "") or "").split(",")
+    if p.strip()
+]
 
 # ── CORS (allow frontend) ─────────────────────────────
 CORS_ORIGINS = [
