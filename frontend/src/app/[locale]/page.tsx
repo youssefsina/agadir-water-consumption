@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import {
     Card,
@@ -35,8 +35,19 @@ import {
     Clock,
     ArrowUpRight,
     ArrowDownRight,
-    Settings
+    Settings,
+    Wifi,
+    WifiOff,
+    Zap,
 } from "lucide-react";
+import { usePipeline } from "@/hooks/use-pipeline";
+import {
+    setAnomalyType,
+    getHealth,
+    getPipelineStatus,
+    type HealthStatus,
+    type PipelineStatus,
+} from "@/lib/api";
 
 type Scenario = "NORMAL" | "LEAK_NIGHT" | "BURST" | "OVER_IRR" | "UNDER_IRR" | "RAIN";
 type DecisionState = "ON" | "PAUSE" | "STOP";
@@ -48,7 +59,7 @@ interface AlertItem {
     type: "warning" | "destructive" | "info";
 }
 
-interface SensorData {
+interface ChartPoint {
     time: string;
     flow: number;
     pressure: number;
@@ -64,118 +75,101 @@ export default function Dashboard() {
     const [scenario, setScenario] = useState<Scenario>("NORMAL");
     const [decision, setDecision] = useState<DecisionState>("ON");
     const [alerts, setAlerts] = useState<AlertItem[]>([]);
-    const [currentData, setCurrentData] = useState<SensorData>({
-        time: "10:00",
-        flow: 120,
-        pressure: 2.5,
-        moisture: 45,
-        temperature: 24,
-        anomalyScore: 5,
+    const [chartHistory, setChartHistory] = useState<ChartPoint[]>([]);
+    const [currentData, setCurrentData] = useState<ChartPoint>({
+        time: "--:--",
+        flow: 0,
+        pressure: 0,
+        moisture: 0,
+        temperature: 0,
+        anomalyScore: 0,
     });
-    const [history, setHistory] = useState<SensorData[]>([]);
 
+    // Backend status
+    const [health, setHealth] = useState<HealthStatus | null>(null);
+    const [pipelineStatus, setPipelineStatus] = useState<PipelineStatus | null>(null);
+
+    // Real-time pipeline connection
+    const { current, history, stats, connected } = usePipeline(30);
+
+    // Fetch health and pipeline status periodically
     useEffect(() => {
-        if (history.length === 0) {
-            const initialHistory = [];
-            const now = new Date();
-            for (let i = 20; i >= 0; i--) {
-                const t2 = new Date(now.getTime() - i * 60000);
-                initialHistory.push({
-                    time: `${t2.getHours().toString().padStart(2, "0")}:${t2.getMinutes().toString().padStart(2, "0")}`,
-                    flow: 115 + Math.random() * 10,
-                    pressure: 2.4 + Math.random() * 0.2,
-                    moisture: 40 + Math.random() * 5,
-                    temperature: 22 + Math.random() * 2,
-                    anomalyScore: Math.random() * 10,
-                });
+        const fetchStatus = async () => {
+            try {
+                const [h, p] = await Promise.all([getHealth(), getPipelineStatus()]);
+                setHealth(h);
+                setPipelineStatus(p);
+            } catch (err) {
+                console.error("Failed to fetch status", err);
             }
-            setHistory(initialHistory);
-        }
+        };
+        fetchStatus();
+        const timer = setInterval(fetchStatus, 30000);
+        return () => clearInterval(timer);
+    }, []);
 
-        const interval = setInterval(() => {
-            const now = new Date();
-            const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
-
-            let newFlow = 115 + Math.random() * 10;
-            let newPressure = 2.4 + Math.random() * 0.2;
-            let newMoisture = currentData.moisture + (decision === "ON" ? 0.5 : -0.2);
-            let newTemperature = 24 + Math.sin(now.getTime() / 10000) * 5;
-            let newAnomalyScore = Math.random() * 15;
-            let newDecision: DecisionState = "ON";
-
-            if (newMoisture > 100) newMoisture = 100;
-            if (newMoisture < 0) newMoisture = 0;
-
-            if (scenario === "LEAK_NIGHT") {
-                newFlow = 30 + Math.random() * 10;
-                newPressure = 2.0 + Math.random() * 0.1;
-                newAnomalyScore = 80 + Math.random() * 15;
-                newDecision = "STOP";
-                addAlert("Leak detected at night (Irrigation OFF but flow > 0)", "destructive");
-            } else if (scenario === "BURST") {
-                newFlow = 300 + Math.random() * 50;
-                newPressure = 0.5 + Math.random() * 0.3;
-                newAnomalyScore = 95 + Math.random() * 5;
-                newDecision = "STOP";
-                addAlert("Pipe burst detected! Pressure dropped, flow spiked.", "destructive");
-            } else if (scenario === "OVER_IRR") {
-                newFlow = 120 + Math.random() * 10;
-                newMoisture = currentData.moisture + 2;
-                if (newMoisture > 65) {
-                    newDecision = "STOP";
-                    newAnomalyScore = 60 + Math.random() * 20;
-                    addAlert("Over-irrigation threshold reached. Moisture > 60%", "warning");
-                }
-            } else if (scenario === "UNDER_IRR") {
-                newFlow = 5 + Math.random() * 2;
-                newPressure = 2.5 + Math.random() * 0.1;
-                newAnomalyScore = 75 + Math.random() * 15;
-                newDecision = "ON";
-                addAlert("Under-irrigation! Pump issue or valve closed.", "destructive");
-            } else if (scenario === "RAIN") {
-                newDecision = "PAUSE";
-                newFlow = 0;
-                newPressure = 0;
-                newAnomalyScore = 5 + Math.random() * 5;
-                addAlert("High rain probability (>60%). Irrigation PAUSED.", "info");
-            } else {
-                if (newMoisture > 60) {
-                    newDecision = "STOP";
-                } else if (newMoisture < 25) {
-                    newDecision = "ON";
-                } else {
-                    newDecision = decision;
-                }
-                if (newDecision === "STOP" || newDecision === "PAUSE") {
-                    newFlow = 0;
-                    newPressure = 0;
-                }
-            }
-
-            setDecision(newDecision);
-            const newData = {
-                time: timeStr,
-                flow: Math.max(0, newFlow),
-                pressure: Math.max(0, newPressure),
-                moisture: newMoisture,
-                temperature: newTemperature,
-                anomalyScore: newAnomalyScore,
-            };
-            setCurrentData(newData);
-            setHistory((prev) => [...prev.slice(-20), newData]);
-        }, 2000);
-
-        return () => clearInterval(interval);
-    }, [scenario, currentData.moisture, decision, history.length]);
-
-    const addAlert = (message: string, type: "warning" | "destructive" | "info") => {
+    // Add alert helper
+    const addAlert = useCallback((message: string, type: "warning" | "destructive" | "info") => {
         setAlerts((prev) => {
             if (prev.length > 0 && prev[0].message === message) return prev;
             return [
                 { id: Math.random().toString(36).substr(2, 9), time: new Date().toLocaleTimeString(), message, type },
-                ...prev.slice(0, 9),
+                ...prev.slice(0, 19),
             ];
         });
+    }, []);
+
+    // Parse pipeline history into chart data
+    useEffect(() => {
+        if (history.length > 0) {
+            const points: ChartPoint[] = history.map((entry) => ({
+                time: new Date(entry.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+                flow: entry.sensor_data.flow_lpm,
+                pressure: entry.sensor_data.pressure_bar,
+                moisture: entry.sensor_data.soil_moisture_pct,
+                temperature: entry.sensor_data.temperature_c,
+                anomalyScore: entry.prediction.is_anomaly
+                    ? entry.prediction.confidence * 100
+                    : Math.max(5, entry.prediction.confidence * 20),
+            }));
+            setChartHistory(points);
+            if (points.length > 0) {
+                setCurrentData(points[points.length - 1]);
+            }
+        }
+    }, [history]);
+
+    // React to new pipeline ticks
+    useEffect(() => {
+        if (!current) return;
+
+        const sd = current.sensor_data;
+        const pred = current.prediction;
+
+        // Update decision from real sensor data
+        if (sd.is_irrigating) {
+            setDecision("ON");
+        } else if (sd.rain_probability > 0.6) {
+            setDecision("PAUSE");
+        } else {
+            setDecision("STOP");
+        }
+
+        // Alert on anomalies
+        if (pred.is_anomaly) {
+            const anType = pred.anomaly_type || "Unknown Anomaly";
+            addAlert(`${anType} detected! Confidence: ${(pred.confidence * 100).toFixed(0)}%`, "destructive");
+        }
+    }, [current, addAlert]);
+
+    // Handle scenario change — sends to backend
+    const handleSetScenario = async (scen: Scenario, anomalyId: number) => {
+        setScenario(scen);
+        try {
+            await setAnomalyType(anomalyId);
+        } catch (e) {
+            console.error("Failed to set scenario", e);
+        }
     };
 
     const getAnomalyColor = (score: number) => {
@@ -197,6 +191,14 @@ export default function Dashboard() {
                         <p className="text-green-700/80 mt-1">{t("subtitle")}</p>
                     </div>
                     <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-green-100 shadow-sm">
+                        {/* Connection indicator */}
+                        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold border ${connected
+                            ? "bg-green-50 text-green-700 border-green-200"
+                            : "bg-red-50 text-red-700 border-red-200"
+                            }`}>
+                            {connected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+                            {connected ? "Live" : "Offline"}
+                        </div>
                         <span className="text-sm font-medium text-green-800">{tCommon("systemStatus")}:</span>
                         {decision === "ON" && (
                             <Badge className="bg-green-500 hover:bg-green-600 px-3 py-1 text-sm"><Power className="w-4 h-4 ltr:mr-1 rtl:ml-1" /> {t("statusOn")}</Badge>
@@ -210,7 +212,38 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* Scenario Simulator */}
+                {/* Backend Status Bar */}
+                {health && (
+                    <div className="flex flex-wrap gap-3 items-center">
+                        <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-green-100 shadow-sm text-xs">
+                            <Zap className="w-3.5 h-3.5 text-green-500" />
+                            <span className="text-green-700 font-medium">Backend: {health.status}</span>
+                            <span className="text-green-500/70">v{health.version}</span>
+                        </div>
+                        <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-green-100 shadow-sm text-xs">
+                            <Activity className="w-3.5 h-3.5 text-blue-500" />
+                            <span className="text-green-700 font-medium">Uptime: {Math.floor((health.uptime_seconds || 0) / 60)}m</span>
+                        </div>
+                        <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-green-100 shadow-sm text-xs">
+                            <Droplets className="w-3.5 h-3.5 text-emerald-500" />
+                            <span className="text-green-700 font-medium">{(health.data_rows_loaded || 0).toLocaleString()} data rows</span>
+                        </div>
+                        {stats && (
+                            <>
+                                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-green-100 shadow-sm text-xs">
+                                    <Activity className="w-3.5 h-3.5 text-indigo-500" />
+                                    <span className="text-green-700 font-medium">Pipeline Ticks: {stats.total_readings}</span>
+                                </div>
+                                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border shadow-sm text-xs ${stats.anomaly_rate > 20 ? "bg-red-50 border-red-200" : "bg-white border-green-100"}`}>
+                                    <AlertTriangle className={`w-3.5 h-3.5 ${stats.anomaly_rate > 20 ? "text-red-500" : "text-yellow-500"}`} />
+                                    <span className={`font-medium ${stats.anomaly_rate > 20 ? "text-red-700" : "text-green-700"}`}>Anomaly Rate: {stats.anomaly_rate}%</span>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {/* Scenario Simulator — sends to real backend */}
                 <Card className="border-green-200 bg-white/80 backdrop-blur">
                     <CardHeader className="pb-3">
                         <CardTitle className="text-sm font-medium text-green-800 flex items-center gap-2">
@@ -220,29 +253,29 @@ export default function Dashboard() {
                     </CardHeader>
                     <CardContent>
                         <div className="flex flex-wrap gap-2">
-                            <Button variant={scenario === "NORMAL" ? "default" : "outline"} onClick={() => setScenario("NORMAL")} className={scenario === "NORMAL" ? "bg-green-600 hover:bg-green-700 text-white" : "border-green-200 text-green-700 hover:bg-green-50"}>
+                            <Button variant={scenario === "NORMAL" ? "default" : "outline"} onClick={() => handleSetScenario("NORMAL", 0)} className={scenario === "NORMAL" ? "bg-green-600 hover:bg-green-700 text-white" : "border-green-200 text-green-700 hover:bg-green-50"}>
                                 {t("scenarioNormal")}
                             </Button>
-                            <Button variant={scenario === "LEAK_NIGHT" ? "destructive" : "outline"} onClick={() => setScenario("LEAK_NIGHT")} className={scenario !== "LEAK_NIGHT" ? "border-green-200 text-green-700 hover:bg-red-50 hover:text-red-600 hover:border-red-200" : ""}>
+                            <Button variant={scenario === "LEAK_NIGHT" ? "destructive" : "outline"} onClick={() => handleSetScenario("LEAK_NIGHT", 1)} className={scenario !== "LEAK_NIGHT" ? "border-green-200 text-green-700 hover:bg-red-50 hover:text-red-600 hover:border-red-200" : ""}>
                                 {t("scenarioLeak")}
                             </Button>
-                            <Button variant={scenario === "BURST" ? "destructive" : "outline"} onClick={() => setScenario("BURST")} className={scenario !== "BURST" ? "border-green-200 text-green-700 hover:bg-red-50 hover:text-red-600 hover:border-red-200" : ""}>
+                            <Button variant={scenario === "BURST" ? "destructive" : "outline"} onClick={() => handleSetScenario("BURST", 2)} className={scenario !== "BURST" ? "border-green-200 text-green-700 hover:bg-red-50 hover:text-red-600 hover:border-red-200" : ""}>
                                 {t("scenarioBurst")}
                             </Button>
-                            <Button variant={scenario === "OVER_IRR" ? "default" : "outline"} onClick={() => setScenario("OVER_IRR")} className={scenario === "OVER_IRR" ? "bg-yellow-500 hover:bg-yellow-600 text-white" : "border-green-200 text-green-700 hover:bg-yellow-50 hover:text-yellow-700 hover:border-yellow-200"}>
+                            <Button variant={scenario === "OVER_IRR" ? "default" : "outline"} onClick={() => handleSetScenario("OVER_IRR", 3)} className={scenario === "OVER_IRR" ? "bg-yellow-500 hover:bg-yellow-600 text-white" : "border-green-200 text-green-700 hover:bg-yellow-50 hover:text-yellow-700 hover:border-yellow-200"}>
                                 {t("scenarioOverIrr")}
                             </Button>
-                            <Button variant={scenario === "UNDER_IRR" ? "destructive" : "outline"} onClick={() => setScenario("UNDER_IRR")} className={scenario !== "UNDER_IRR" ? "border-green-200 text-green-700 hover:bg-red-50 hover:text-red-600 hover:border-red-200" : ""}>
+                            <Button variant={scenario === "UNDER_IRR" ? "destructive" : "outline"} onClick={() => handleSetScenario("UNDER_IRR", 4)} className={scenario !== "UNDER_IRR" ? "border-green-200 text-green-700 hover:bg-red-50 hover:text-red-600 hover:border-red-200" : ""}>
                                 {t("scenarioUnderIrr")}
                             </Button>
-                            <Button variant={scenario === "RAIN" ? "secondary" : "outline"} onClick={() => setScenario("RAIN")} className={scenario === "RAIN" ? "bg-blue-500 hover:bg-blue-600 text-white" : "border-green-200 text-green-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200"}>
+                            <Button variant={scenario === "RAIN" ? "secondary" : "outline"} onClick={() => handleSetScenario("RAIN", 5)} className={scenario === "RAIN" ? "bg-blue-500 hover:bg-blue-600 text-white" : "border-green-200 text-green-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200"}>
                                 {t("scenarioRain")}
                             </Button>
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* Metrics Grid */}
+                {/* Metrics Grid — from real data */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <Card className="border-green-100 shadow-sm hover:shadow-md transition-shadow">
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -252,7 +285,7 @@ export default function Dashboard() {
                         <CardContent>
                             <div className="text-2xl font-bold text-green-900">{currentData.flow.toFixed(1)} <span className="text-sm font-normal text-green-600">L/min</span></div>
                             <p className="text-xs text-green-600/80 mt-1 flex items-center">
-                                {currentData.flow > 100 && scenario !== "BURST" ? <ArrowUpRight className="w-3 h-3 text-green-500 ltr:mr-1 rtl:ml-1" /> : (scenario === "BURST" ? <ArrowUpRight className="w-3 h-3 text-red-500 ltr:mr-1 rtl:ml-1" /> : <ArrowDownRight className="w-3 h-3 text-green-500 ltr:mr-1 rtl:ml-1" />)}
+                                {currentData.flow > 100 ? <ArrowUpRight className="w-3 h-3 text-green-500 ltr:mr-1 rtl:ml-1" /> : <ArrowDownRight className="w-3 h-3 text-green-500 ltr:mr-1 rtl:ml-1" />}
                                 {t("fromBaseline")}
                             </p>
                         </CardContent>
@@ -266,8 +299,8 @@ export default function Dashboard() {
                         <CardContent>
                             <div className="text-2xl font-bold text-green-900">{currentData.pressure.toFixed(2)} <span className="text-sm font-normal text-green-600">Bar</span></div>
                             <p className="text-xs text-green-600/80 mt-1 flex items-center">
-                                {scenario === "BURST" && <span className="text-red-500 flex items-center"><ArrowDownRight className="w-3 h-3 ltr:mr-1 rtl:ml-1" />{t("criticalDrop")}</span>}
-                                {scenario !== "BURST" && t("stablePressure")}
+                                {currentData.pressure < 1.5 && <span className="text-red-500 flex items-center"><ArrowDownRight className="w-3 h-3 ltr:mr-1 rtl:ml-1" />{t("criticalDrop")}</span>}
+                                {currentData.pressure >= 1.5 && t("stablePressure")}
                             </p>
                         </CardContent>
                     </Card>
@@ -291,7 +324,7 @@ export default function Dashboard() {
                         <CardContent>
                             <div className="text-2xl font-bold text-green-900">{currentData.temperature.toFixed(1)} <span className="text-sm font-normal text-green-600">°C</span></div>
                             <p className="text-xs text-green-600/80 mt-1">
-                                {scenario === "RAIN" ? t("coolingDown") : t("expectedCurve")}
+                                {currentData.temperature < 20 ? t("coolingDown") : t("expectedCurve")}
                             </p>
                         </CardContent>
                     </Card>
@@ -302,12 +335,14 @@ export default function Dashboard() {
                     <Card className="lg:col-span-2 border-green-200 shadow-sm">
                         <CardHeader>
                             <CardTitle className="text-green-800">{t("flowPressureHistory")}</CardTitle>
-                            <CardDescription>{t("realtimeVisualization")}</CardDescription>
+                            <CardDescription>
+                                {connected ? "🔴 Live data from IoT pipeline" : "⏳ Waiting for connection..."}
+                            </CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="h-[300px] w-full mt-4" dir="ltr">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={history} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+                                    <AreaChart data={chartHistory} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
                                         <defs>
                                             <linearGradient id="colorFlow" x1="0" y1="0" x2="0" y2="1">
                                                 <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
@@ -338,7 +373,7 @@ export default function Dashboard() {
                                 <CardTitle className="text-green-800 flex items-center justify-between">
                                     <span>{t("anomalyScore")}</span>
                                     <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 rounded-md text-xs font-semibold text-green-700 border border-green-100">
-                                        {t("isolationForest")}
+                                        Random Forest
                                     </div>
                                 </CardTitle>
                             </CardHeader>
@@ -357,6 +392,18 @@ export default function Dashboard() {
                                         <><Activity className="w-3 h-3 text-green-500 shrink-0" /><span>{t("normalOperation")}</span></>
                                     )}
                                 </p>
+                                {current?.prediction && (
+                                    <div className="mt-3 pt-3 border-t border-green-100 text-xs text-green-700 space-y-1">
+                                        <div className="flex justify-between">
+                                            <span className="text-green-600">Detected Type:</span>
+                                            <span className="font-semibold">{current.prediction.anomaly_type}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-green-600">Ground Truth:</span>
+                                            <span className="font-semibold">{current.ground_truth?.anomaly_type || "–"}</span>
+                                        </div>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
 

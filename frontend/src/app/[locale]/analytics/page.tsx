@@ -1,8 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BrainCircuit, Droplet, CircleDollarSign, TrendingDown, Target, Zap, AlertCircle } from "lucide-react";
+import { BrainCircuit, Droplet, CircleDollarSign, TrendingDown, Target, Zap, AlertCircle, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import {
     ScatterChart,
@@ -13,40 +14,94 @@ import {
     CartesianGrid,
     Tooltip,
     ResponsiveContainer,
-    Legend
+    Legend,
+    BarChart,
+    Bar,
 } from 'recharts';
+import {
+    getDataStats,
+    getAnomalyTypes,
+    listAIModels,
+    getPipelineHistory,
+    type DataStats,
+    type AIModel,
+    type PipelineEntry,
+} from "@/lib/api";
 
 export default function AnalyticsPage() {
     const t = useTranslations('analytics');
-    
-    // Mock data for Isolation Forest Visualization
-    // Normal cluster around low anomaly score, tight flow/pressure relationship
-    // Outliers (Leaks) with high flow, low pressure, high anomaly score
-    // Outliers (Clogs) with low flow, high pressure, high anomaly score
 
-    const generateData = () => {
-        const normal = Array.from({ length: 50 }, () => ({
-            x: 100 + (Math.random() - 0.5) * 20, // Flow (L/min)
-            y: 2.5 + (Math.random() - 0.5) * 0.4, // Pressure (Bar)
-            z: 5 + Math.random() * 15,          // Anomaly Score
-        }));
+    const [stats, setStats] = useState<DataStats | null>(null);
+    const [anomalyTypes, setAnomalyTypes] = useState<Record<string, number>>({});
+    const [models, setModels] = useState<AIModel[]>([]);
+    const [pipelineData, setPipelineData] = useState<PipelineEntry[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-        const leaks = Array.from({ length: 15 }, () => ({
-            x: 180 + Math.random() * 50,         // High Flow
-            y: 1.0 + Math.random() * 0.8,         // Low Pressure
-            z: 80 + Math.random() * 20,          // High Anomaly
-        }));
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                const [statsRes, anomalyRes, modelsRes, historyRes] = await Promise.all([
+                    getDataStats("raw"),
+                    getAnomalyTypes(),
+                    listAIModels(),
+                    getPipelineHistory(200),
+                ]);
+                setStats(statsRes);
+                setAnomalyTypes(anomalyRes);
+                setModels(modelsRes.models);
+                setPipelineData(historyRes.data);
+                setError(null);
+            } catch (err) {
+                console.error("Analytics fetch error", err);
+                setError("Failed to load analytics data");
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+        const timer = setInterval(fetchData, 60000);
+        return () => clearInterval(timer);
+    }, []);
 
-        const clogs = Array.from({ length: 10 }, () => ({
-            x: 20 + Math.random() * 30,          // Low Flow
-            y: 3.5 + Math.random() * 0.5,         // High Pressure
-            z: 75 + Math.random() * 20,          // High Anomaly
-        }));
+    // Build scatter data from real pipeline entries
+    const scatterNormal: { x: number; y: number; z: number }[] = [];
+    const scatterAnomalies: { x: number; y: number; z: number; type: string }[] = [];
 
-        return { normal, leaks, clogs };
-    };
+    pipelineData.forEach((entry) => {
+        const point = {
+            x: entry.sensor_data.flow_lpm,
+            y: entry.sensor_data.pressure_bar,
+            z: entry.prediction.confidence * 100,
+        };
+        if (entry.prediction.is_anomaly) {
+            scatterAnomalies.push({ ...point, type: entry.prediction.anomaly_type });
+        } else {
+            scatterNormal.push(point);
+        }
+    });
 
-    const { normal, leaks, clogs } = generateData();
+    // Anomaly distribution bar chart from dataset
+    const anomalyBarData = Object.entries(anomalyTypes)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count);
+
+    const totalAnomalies = pipelineData.filter(e => e.prediction.is_anomaly).length;
+    const totalNormal = pipelineData.length - totalAnomalies;
+    const estimatedLitersSaved = totalAnomalies * 850;
+    const estimatedMoneySaved = (estimatedLitersSaved * 0.007).toFixed(0);
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-green-50/50 p-4 md:p-8 font-sans text-green-950 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="w-10 h-10 text-green-600 animate-spin" />
+                    <p className="text-green-700 font-medium">Loading analytics...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-green-50/50 p-4 md:p-8 font-sans text-green-950">
@@ -57,11 +112,16 @@ export default function AnalyticsPage() {
                             <BrainCircuit className="w-8 h-8 text-indigo-600" />
                             {t('title')}
                         </h1>
-                        <p className="text-green-700/80 mt-1">{t('subtitle')}</p>
+                        <p className="text-green-700/80 mt-1">{t('subtitle')} — Live pipeline data</p>
                     </div>
+                    {error && (
+                        <Badge variant="destructive" className="px-3 py-1">
+                            <AlertCircle className="w-3 h-3 ltr:mr-1 rtl:ml-1" /> {error}
+                        </Badge>
+                    )}
                 </div>
 
-                {/* Wow Factor Hero Counters */}
+                {/* Hero Counters */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <Card className="border-blue-200 bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-lg overflow-hidden relative group">
                         <CardContent className="p-6">
@@ -71,7 +131,8 @@ export default function AnalyticsPage() {
                                         <Droplet className="w-4 h-4" /> {t('waterSaved')}
                                     </p>
                                     <h2 className="text-5xl font-black tracking-tight">
-                                        1.2M <span className="text-2xl font-semibold opacity-80">{t('liters')}</span>
+                                        {estimatedLitersSaved >= 1000 ? `${(estimatedLitersSaved / 1000).toFixed(1)}K` : estimatedLitersSaved}
+                                        <span className="text-2xl font-semibold opacity-80"> {t('liters')}</span>
                                     </h2>
                                 </div>
                             </div>
@@ -89,9 +150,7 @@ export default function AnalyticsPage() {
                                     <p className="text-emerald-100 font-medium mb-1 flex items-center gap-2">
                                         <CircleDollarSign className="w-4 h-4" /> {t('moneySaved')}
                                     </p>
-                                    <h2 className="text-5xl font-black tracking-tight">
-                                        $8,450
-                                    </h2>
+                                    <h2 className="text-5xl font-black tracking-tight">${estimatedMoneySaved}</h2>
                                 </div>
                             </div>
                             <div className="mt-4 flex items-center gap-2 text-emerald-100 bg-black/10 w-max px-3 py-1 rounded-full text-sm font-medium relative z-10">
@@ -109,7 +168,7 @@ export default function AnalyticsPage() {
                                         <Target className="w-4 h-4" /> {t('detected')}
                                     </p>
                                     <h2 className="text-5xl font-black tracking-tight">
-                                        142 <span className="text-xl font-semibold opacity-80">{t('prevented')}</span>
+                                        {totalAnomalies} <span className="text-xl font-semibold opacity-80">{t('prevented')}</span>
                                     </h2>
                                 </div>
                             </div>
@@ -122,17 +181,14 @@ export default function AnalyticsPage() {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Main Scatter Plot */}
                     <Card className="lg:col-span-2 border-indigo-100 shadow-md">
                         <CardHeader className="bg-white pb-2 border-b border-indigo-50">
                             <div>
                                 <CardTitle className="text-indigo-900 flex items-center gap-2">
                                     {t('modelVisualization')}
-                                    <span className="text-xs font-semibold bg-indigo-100 text-indigo-700 px-2 py-1 rounded border border-indigo-200 uppercase tracking-wider">Live Visualization</span>
+                                    <span className="text-xs font-semibold bg-indigo-100 text-indigo-700 px-2 py-1 rounded border border-indigo-200 uppercase tracking-wider">Live Data</span>
                                 </CardTitle>
-                                <CardDescription>
-                                    {t('modelDesc')}
-                                </CardDescription>
+                                <CardDescription>{t('modelDesc')}</CardDescription>
                             </div>
                         </CardHeader>
                         <CardContent className="pt-6">
@@ -141,60 +197,76 @@ export default function AnalyticsPage() {
                                     <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 0 }}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                         <XAxis type="number" dataKey="x" name="Flow" unit=" L/min" stroke="#64748b"
-                                            label={{ value: 'Irrigation Flow Rate (L/min)', position: 'insideBottom', offset: -10, fill: '#64748b', fontSize: 12 }} />
+                                            label={{ value: 'Flow Rate (L/min)', position: 'insideBottom', offset: -10, fill: '#64748b', fontSize: 12 }} />
                                         <YAxis type="number" dataKey="y" name="Pressure" unit=" Bar" stroke="#64748b"
-                                            label={{ value: 'Pipeline Pressure (Bar)', angle: -90, position: 'insideLeft', fill: '#64748b', fontSize: 12 }} />
-                                        <ZAxis type="number" dataKey="z" range={[40, 400]} name="Anomaly Score" />
+                                            label={{ value: 'Pressure (Bar)', angle: -90, position: 'insideLeft', fill: '#64748b', fontSize: 12 }} />
+                                        <ZAxis type="number" dataKey="z" range={[40, 400]} name="Confidence %" />
                                         <Tooltip cursor={{ strokeDasharray: '3 3' }}
                                             contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', padding: '12px' }} />
                                         <Legend verticalAlign="top" height={36} />
-                                        <Scatter name={t('normalOperations')} data={normal} fill="#10b981" fillOpacity={0.6} />
-                                        <Scatter name={t('leaksDetected')} data={leaks} fill="#ef4444" fillOpacity={0.8} />
-                                        <Scatter name={t('clogsDetected')} data={clogs} fill="#f59e0b" fillOpacity={0.8} />
+                                        <Scatter name={`${t('normalOperations')} (${scatterNormal.length})`} data={scatterNormal} fill="#10b981" fillOpacity={0.6} />
+                                        <Scatter name={`Anomalies (${scatterAnomalies.length})`} data={scatterAnomalies} fill="#ef4444" fillOpacity={0.8} />
                                     </ScatterChart>
                                 </ResponsiveContainer>
                             </div>
                         </CardContent>
                     </Card>
 
-                    {/* Model Insights Sidebar */}
                     <div className="flex flex-col gap-4">
                         <Card className="border-indigo-100 shadow-sm flex-1 bg-gradient-to-b from-white to-indigo-50/30">
                             <CardHeader className="pb-3">
                                 <CardTitle className="text-indigo-900 text-lg">{t('insightsDesc')}</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4 text-sm text-indigo-950/80 leading-relaxed">
-                                <p>
-                                    Instead of building a profile of "normal" behavior, the <strong>Isolation Forest</strong> algorithm explicitly isolates anomalies.
-                                </p>
-                                <div className="bg-white p-3 rounded-lg border border-indigo-100 shadow-sm relative overflow-hidden">
-                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500"></div>
-                                    <h4 className="font-semibold text-emerald-700 mb-1 flex items-center gap-1.5"><Target className="w-4 h-4" /> Inliers (Normal Data)</h4>
-                                    <p className="text-xs">Normal operations form a dense cluster. It takes many random partitions to isolate these points, resulting in a low anomaly score.</p>
+                                <div className="mt-2 pt-2 border-t border-indigo-100">
+                                    <div className="text-xs font-semibold text-indigo-900 mb-2 uppercase tracking-wide">Models</div>
+                                    {models.length > 0 ? models.map((m, i) => (
+                                        <div key={i} className="flex justify-between items-center mb-2">
+                                            <span className="text-xs font-medium">{m.name || m.type}</span>
+                                            <Badge className={`${m.is_loaded ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-red-100 text-red-700 hover:bg-red-200"}`}>
+                                                {m.is_loaded ? "Loaded" : "Not Loaded"}
+                                            </Badge>
+                                        </div>
+                                    )) : (
+                                        <p className="text-xs text-indigo-500">Loading...</p>
+                                    )}
                                 </div>
-                                <div className="bg-white p-3 rounded-lg border border-indigo-100 shadow-sm relative overflow-hidden">
-                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500"></div>
-                                    <h4 className="font-semibold text-red-700 mb-1 flex items-center gap-1.5"><AlertCircle className="w-4 h-4" /> Outliers (Anomalies)</h4>
-                                    <p className="text-xs">Leaks or clogs result in rare value combinations (e.g., high flow with low pressure). They are susceptible to isolation and are detected quickly near the root of the tree.</p>
-                                </div>
-                                <div className="mt-4 pt-4 border-t border-indigo-100">
-                                    <div className="text-xs font-semibold text-indigo-900 mb-2 uppercase tracking-wide">Current Model Status</div>
-                                    <div className="flex justify-between items-center mb-1">
-                                        <span className="text-xs font-medium">Contamination Parameter</span>
-                                        <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200">Auto (0.05)</Badge>
+                                {stats && (
+                                    <div className="pt-3 border-t border-indigo-100">
+                                        <div className="text-xs font-semibold text-indigo-900 mb-2 uppercase tracking-wide">Dataset</div>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="text-xs font-medium">Total Rows</span>
+                                            <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200">{stats.total_rows?.toLocaleString()}</Badge>
+                                        </div>
                                     </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-xs font-medium">Training Data Horizon</span>
-                                        <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200">Rolling 30-Day</Badge>
-                                    </div>
-                                </div>
+                                )}
                             </CardContent>
                         </Card>
                     </div>
                 </div>
+
+                {anomalyBarData.length > 0 && (
+                    <Card className="border-indigo-100 shadow-md">
+                        <CardHeader>
+                            <CardTitle className="text-indigo-900">Anomaly Type Distribution</CardTitle>
+                            <CardDescription>From training dataset loaded in the backend</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="h-[300px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={anomalyBarData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                        <XAxis dataKey="name" stroke="#64748b" fontSize={12} />
+                                        <YAxis stroke="#64748b" fontSize={12} />
+                                        <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                                        <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
             </div>
         </div>
     );
 }
-
-

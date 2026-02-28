@@ -4,8 +4,10 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Map as MapIcon, AlertTriangle, Droplets, Info } from "lucide-react";
+import { Map as MapIcon, AlertTriangle, Droplets, Info, Wifi, WifiOff } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { usePipeline } from "@/hooks/use-pipeline";
+import { setAnomalyType } from "@/lib/api";
 
 type ZoneId = "north" | "orchard" | "south" | "west";
 
@@ -13,7 +15,7 @@ interface Zone {
     id: ZoneId;
     name: string;
     type: string;
-    moisture: number; // 0-100%
+    moisture: number;
     status: "optimal" | "dry" | "over-watered";
     x: number;
     y: number;
@@ -23,41 +25,63 @@ interface Zone {
 
 export default function FarmMapPage() {
     const t = useTranslations('map');
+    const { current, stats, connected } = usePipeline(10);
+
+    const realMoisture = current?.sensor_data?.soil_moisture_pct ?? 45;
+    const isPipeAnomaly = current?.prediction?.is_anomaly ?? false;
+    const anomalyType = current?.prediction?.anomaly_type ?? "Normal";
+    const isIrrigating = current?.sensor_data?.is_irrigating ?? 0;
+
     const [zones, setZones] = useState<Zone[]>([
         { id: "north", name: "North Field", type: "Corn", moisture: 45, status: "optimal", x: 10, y: 10, width: 35, height: 35 },
-        { id: "orchard", name: "East Orchard", type: "Citrus", moisture: 20, status: "dry", x: 55, y: 10, width: 35, height: 45 },
-        { id: "south", name: "South Greenhouse", type: "Tomatoes", moisture: 85, status: "over-watered", x: 10, y: 55, width: 45, height: 35 },
-        { id: "west", name: "West Pasture", type: "Alfalfa", moisture: 55, status: "optimal", x: 65, y: 65, width: 25, height: 25 },
+        { id: "orchard", name: "East Orchard", type: "Citrus", moisture: 38, status: "optimal", x: 55, y: 10, width: 35, height: 45 },
+        { id: "south", name: "South Greenhouse", type: "Tomatoes", moisture: 50, status: "optimal", x: 10, y: 55, width: 45, height: 35 },
+        { id: "west", name: "West Pasture", type: "Alfalfa", moisture: 42, status: "optimal", x: 65, y: 65, width: 25, height: 25 },
     ]);
 
-    const [leakActive, setLeakActive] = useState<ZoneId | null>(null);
+    const [activeAnomaly, setActiveAnomaly] = useState<ZoneId | null>(null);
 
-    // Simulate moisture changes
     useEffect(() => {
-        const interval = setInterval(() => {
-            setZones(prev => prev.map(zone => {
-                let newMoisture = zone.moisture;
-                if (leakActive === zone.id) {
-                    // Rapidly increase moisture in leak area
-                    newMoisture = Math.min(100, zone.moisture + 5);
-                } else {
-                    // Slow evaporation
-                    newMoisture = Math.max(0, zone.moisture - 0.5);
-                }
+        if (!current) return;
+        setZones(prev => prev.map((zone, idx) => {
+            const offsets = [0, -7, 12, -3];
+            let newMoisture = Math.max(0, Math.min(100, realMoisture + offsets[idx]));
+            if (isPipeAnomaly && activeAnomaly === zone.id) {
+                if (anomalyType === "Over_Irrigation") newMoisture = Math.min(100, newMoisture + 20);
+                else if (anomalyType === "Pipe_Burst") newMoisture = Math.min(100, newMoisture + 30);
+            }
+            let status: Zone["status"] = "optimal";
+            if (newMoisture < 30) status = "dry";
+            else if (newMoisture > 70) status = "over-watered";
+            return { ...zone, moisture: newMoisture, status };
+        }));
+    }, [current, realMoisture, isPipeAnomaly, anomalyType, activeAnomaly]);
 
-                let newStatus: Zone["status"] = "optimal";
-                if (newMoisture < 30) newStatus = "dry";
-                else if (newMoisture > 70) newStatus = "over-watered";
+    useEffect(() => {
+        if (isPipeAnomaly) {
+            if (anomalyType === "Night_Leak") setActiveAnomaly("north");
+            else if (anomalyType === "Pipe_Burst") setActiveAnomaly("south");
+            else if (anomalyType === "Over_Irrigation") setActiveAnomaly("orchard");
+            else if (anomalyType === "Under_Irrigation") setActiveAnomaly("west");
+            else setActiveAnomaly(null);
+        } else {
+            setActiveAnomaly(null);
+        }
+    }, [isPipeAnomaly, anomalyType]);
 
-                return { ...zone, moisture: newMoisture, status: newStatus };
-            }));
-        }, 2000);
-
-        return () => clearInterval(interval);
-    }, [leakActive]);
-
-    const triggerLeak = (zoneId: ZoneId) => {
-        setLeakActive(prev => prev === zoneId ? null : zoneId);
+    const triggerAnomaly = async (zoneId: ZoneId) => {
+        const anomalyMap: Record<ZoneId, number> = { north: 1, orchard: 3, south: 2, west: 4 };
+        try {
+            if (activeAnomaly === zoneId) {
+                await setAnomalyType(0);
+                setActiveAnomaly(null);
+            } else {
+                await setAnomalyType(anomalyMap[zoneId]);
+                setActiveAnomaly(zoneId);
+            }
+        } catch (e) {
+            console.error("Failed to trigger anomaly", e);
+        }
     };
 
     const getZoneColor = (status: Zone["status"]) => {
@@ -85,10 +109,16 @@ export default function FarmMapPage() {
                             <MapIcon className="w-8 h-8 text-green-600" />
                             {t('title')}
                         </h1>
-                        <p className="text-green-700/80 mt-1">{t('subtitle')}</p>
+                        <p className="text-green-700/80 mt-1">{t('subtitle')} — Live IoT data</p>
                     </div>
-
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center">
+                        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold border ${connected
+                            ? "bg-green-50 text-green-700 border-green-200"
+                            : "bg-red-50 text-red-700 border-red-200"
+                            }`}>
+                            {connected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+                            {connected ? "Live" : "Offline"}
+                        </div>
                         <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300 px-3 py-1">{t('dry')}</Badge>
                         <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 px-3 py-1">{t('optimal')}</Badge>
                         <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 px-3 py-1">{t('overWatered')}</Badge>
@@ -100,55 +130,31 @@ export default function FarmMapPage() {
                         <CardHeader className="bg-green-50/50 border-b border-green-100 pb-3">
                             <CardTitle className="text-green-800 text-lg flex justify-between items-center">
                                 <span>{t('liveZoneMap')}</span>
-                                {leakActive && (
+                                {isPipeAnomaly && (
                                     <span className="flex items-center gap-2 text-red-600 text-sm animate-pulse bg-red-50 px-3 py-1 rounded-full">
-                                        <AlertTriangle className="w-4 h-4" /> {t('simulateLeak')}
+                                        <AlertTriangle className="w-4 h-4" /> {anomalyType} detected!
                                     </span>
                                 )}
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-0">
                             <div className="relative w-full aspect-video bg-[#e8eedd] overflow-hidden">
-                                {/* Simulated Grid Background */}
                                 <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(#c5d1b3 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
 
-                                {/* Central Pump Station */}
-                                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-gray-800 rounded-full z-20 flex items-center justify-center border-4 border-gray-300 shadow-lg">
-                                    <Droplets className="w-6 h-6 text-blue-400" />
+                                <div className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full z-20 flex items-center justify-center border-4 shadow-lg ${isIrrigating ? "bg-green-700 border-green-400" : "bg-gray-800 border-gray-300"}`}>
+                                    <Droplets className={`w-6 h-6 ${isIrrigating ? "text-green-200" : "text-blue-400"}`} />
                                 </div>
 
-                                {/* Main Pipelines */}
                                 <svg className="absolute inset-0 w-full h-full z-10 pointer-events-none">
-                                    {/* North Pipe */}
-                                    <line x1="50%" y1="50%" x2="27.5%" y2="27.5%"
-                                        className={`stroke-8 ${leakActive === "north" ? "stroke-red-500 animate-pulse" : "stroke-blue-400/60"}`}
-                                        strokeWidth="4" strokeDasharray={leakActive === "north" ? "none" : "5,5"} />
-                                    {/* East Pipe */}
-                                    <line x1="50%" y1="50%" x2="72.5%" y2="32.5%"
-                                        className={`stroke-8 ${leakActive === "orchard" ? "stroke-red-500 animate-pulse" : "stroke-blue-400/60"}`}
-                                        strokeWidth="4" strokeDasharray={leakActive === "orchard" ? "none" : "5,5"} />
-                                    {/* South Pipe */}
-                                    <line x1="50%" y1="50%" x2="32.5%" y2="72.5%"
-                                        className={`stroke-8 ${leakActive === "south" ? "stroke-red-500 animate-pulse" : "stroke-blue-400/60"}`}
-                                        strokeWidth="4" strokeDasharray={leakActive === "south" ? "none" : "5,5"} />
-                                    {/* West Pipe */}
-                                    <line x1="50%" y1="50%" x2="77.5%" y2="77.5%"
-                                        className={`stroke-8 ${leakActive === "west" ? "stroke-red-500 animate-pulse" : "stroke-blue-400/60"}`}
-                                        strokeWidth="4" strokeDasharray={leakActive === "west" ? "none" : "5,5"} />
+                                    <line x1="50%" y1="50%" x2="27.5%" y2="27.5%" className={`${activeAnomaly === "north" ? "stroke-red-500 animate-pulse" : "stroke-blue-400/60"}`} strokeWidth="4" strokeDasharray={activeAnomaly === "north" ? "none" : "5,5"} />
+                                    <line x1="50%" y1="50%" x2="72.5%" y2="32.5%" className={`${activeAnomaly === "orchard" ? "stroke-red-500 animate-pulse" : "stroke-blue-400/60"}`} strokeWidth="4" strokeDasharray={activeAnomaly === "orchard" ? "none" : "5,5"} />
+                                    <line x1="50%" y1="50%" x2="32.5%" y2="72.5%" className={`${activeAnomaly === "south" ? "stroke-red-500 animate-pulse" : "stroke-blue-400/60"}`} strokeWidth="4" strokeDasharray={activeAnomaly === "south" ? "none" : "5,5"} />
+                                    <line x1="50%" y1="50%" x2="77.5%" y2="77.5%" className={`${activeAnomaly === "west" ? "stroke-red-500 animate-pulse" : "stroke-blue-400/60"}`} strokeWidth="4" strokeDasharray={activeAnomaly === "west" ? "none" : "5,5"} />
                                 </svg>
 
-                                {/* Farm Zones */}
                                 {zones.map(zone => (
-                                    <div
-                                        key={zone.id}
-                                        className={`absolute border-2 rounded-xl flex flex-col items-center justify-center p-2 shadow-sm transition-all duration-500 z-10 ${getZoneColor(zone.status)} hover:scale-[1.02] cursor-pointer hover:z-30`}
-                                        style={{
-                                            left: `${zone.x}%`,
-                                            top: `${zone.y}%`,
-                                            width: `${zone.width}%`,
-                                            height: `${zone.height}%`,
-                                        }}
-                                    >
+                                    <div key={zone.id} className={`absolute border-2 rounded-xl flex flex-col items-center justify-center p-2 shadow-sm transition-all duration-500 z-10 ${getZoneColor(zone.status)} hover:scale-[1.02] cursor-pointer hover:z-30`}
+                                        style={{ left: `${zone.x}%`, top: `${zone.y}%`, width: `${zone.width}%`, height: `${zone.height}%` }}>
                                         <div className="bg-white/80 backdrop-blur-sm px-3 py-2 rounded-lg text-center shadow-sm w-full max-w-[90%]">
                                             <p className={`font-bold text-sm ${getTextColor(zone.status)}`}>{zone.name}</p>
                                             <p className="text-xs text-gray-600 mb-1">{zone.type}</p>
@@ -157,9 +163,8 @@ export default function FarmMapPage() {
                                                 <span className={getTextColor(zone.status)}>{zone.moisture.toFixed(1)}%</span>
                                             </div>
                                         </div>
-                                        {leakActive === zone.id && (
-                                            <div className="absolute inset-0 bg-red-500/10 rounded-xl animate-pulse flex items-center justify-center pointer-events-none">
-                                            </div>
+                                        {activeAnomaly === zone.id && (
+                                            <div className="absolute inset-0 bg-red-500/10 rounded-xl animate-pulse flex items-center justify-center pointer-events-none"></div>
                                         )}
                                     </div>
                                 ))}
@@ -178,26 +183,38 @@ export default function FarmMapPage() {
                             </CardHeader>
                             <CardContent className="space-y-3">
                                 {zones.map(zone => (
-                                    <Button
-                                        key={`btn-\${zone.id}`}
-                                        variant={leakActive === zone.id ? "destructive" : "outline"}
-                                        className="w-full justify-start border-green-200"
-                                        onClick={() => triggerLeak(zone.id)}
-                                    >
-                                        {leakActive === zone.id ? "Fix Burst in " : "Simulate Burst in "} {zone.name}
+                                    <Button key={`btn-${zone.id}`} variant={activeAnomaly === zone.id ? "destructive" : "outline"} className="w-full justify-start border-green-200" onClick={() => triggerAnomaly(zone.id)}>
+                                        {activeAnomaly === zone.id ? "Fix: " : "Trigger: "}{zone.name}
                                     </Button>
                                 ))}
+                                <Button variant="outline" className="w-full justify-start border-green-200 text-green-700"
+                                    onClick={() => { setAnomalyType(0); setActiveAnomaly(null); }}>
+                                    🔄 Reset to Normal
+                                </Button>
                             </CardContent>
                         </Card>
+
+                        {current && (
+                            <Card className="border-green-200 shadow-sm">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-green-800 text-sm">Live Sensor</CardTitle>
+                                </CardHeader>
+                                <CardContent className="text-xs space-y-1 text-green-700">
+                                    <div className="flex justify-between"><span>Flow:</span><span className="font-mono font-bold">{current.sensor_data.flow_lpm.toFixed(1)} L/min</span></div>
+                                    <div className="flex justify-between"><span>Pressure:</span><span className="font-mono font-bold">{current.sensor_data.pressure_bar.toFixed(2)} Bar</span></div>
+                                    <div className="flex justify-between"><span>Moisture:</span><span className="font-mono font-bold">{current.sensor_data.soil_moisture_pct.toFixed(1)}%</span></div>
+                                    <div className="flex justify-between"><span>AI:</span><span className="font-mono font-bold">{current.prediction.anomaly_type}</span></div>
+                                </CardContent>
+                            </Card>
+                        )}
 
                         <Card className="border-blue-200 bg-blue-50/50 shadow-sm">
                             <CardContent className="p-4 flex gap-3 items-start">
                                 <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
                                 <div>
-                                    <h4 className="font-semibold text-sm text-blue-900">Why this matters?</h4>
+                                    <h4 className="font-semibold text-sm text-blue-900">Real-Time Integration</h4>
                                     <p className="text-xs text-blue-800/80 mt-1 leading-relaxed">
-                                        Spatial context helps operators quickly locate issues. When a pressure drop is detected by the AI,
-                                        highlighting the exact pipeline segment saves hours of manual searching across a massive farm.
+                                        Zones reflect real soil moisture from the backend IoT pipeline. Triggering an anomaly sends commands to the backend simulator.
                                     </p>
                                 </div>
                             </CardContent>
@@ -205,6 +222,6 @@ export default function FarmMapPage() {
                     </div>
                 </div>
             </div>
-        </div >
+        </div>
     );
 }
