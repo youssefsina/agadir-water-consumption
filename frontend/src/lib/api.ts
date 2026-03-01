@@ -5,7 +5,7 @@
  * Provides typed fetch wrappers for all REST endpoints + WebSocket helpers.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://agadir-water-consumption-vejs.vercel.app";
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://agadir-water-consumption-vejs.vercel.app").replace(/\/+$/, "");
 const WS_BASE = API_BASE.replace(/^http/, "ws");
 
 // ── Types ────────────────────────────────────────────────
