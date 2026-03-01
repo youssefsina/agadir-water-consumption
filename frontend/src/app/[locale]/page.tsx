@@ -16,6 +16,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 
 import {
     Activity,
@@ -46,6 +47,7 @@ interface AlertItem {
     time: string;
     message: string;
     type: "warning" | "destructive" | "info";
+    recipients?: string[];
 }
 
 interface ChartPoint {
@@ -79,6 +81,7 @@ export default function Dashboard() {
     const [scenario, setScenario] = useState<Scenario>("NORMAL");
     const [decision, setDecision] = useState<DecisionState>("ON");
     const [alerts, setAlerts] = useState<AlertItem[]>([]);
+    const [showDebug, setShowDebug] = useState<boolean>(false);
     const [currentData, setCurrentData] = useState<ChartPoint>({
         time: "--:--",
         flow: 0,
@@ -132,11 +135,11 @@ export default function Dashboard() {
     }, []);
 
     // Add alert helper
-    const addAlert = useCallback((message: string, type: "warning" | "destructive" | "info") => {
+    const addAlert = useCallback((message: string, type: "warning" | "destructive" | "info", recipients?: string[]) => {
         setAlerts((prev) => {
             if (prev.length > 0 && prev[0].message === message) return prev;
             return [
-                { id: Math.random().toString(36).substr(2, 9), time: new Date().toLocaleTimeString(), message, type },
+                { id: Math.random().toString(36).substr(2, 9), time: new Date().toLocaleTimeString(), message, type, recipients },
                 ...prev.slice(0, 19),
             ];
         });
@@ -181,7 +184,11 @@ export default function Dashboard() {
         // Alert on anomalies
         if (pred.is_anomaly) {
             const anType = pred.anomaly_type || "Unknown Anomaly";
-            addAlert(`${anType} detected! Confidence: ${(pred.confidence * 100).toFixed(0)}%`, "destructive");
+            let recipients: string[] | undefined = undefined;
+            if (current.whatsapp_result?.results) {
+                recipients = current.whatsapp_result.results.filter((r: any) => r.success).map((r: any) => r.phone);
+            }
+            addAlert(`${anType} detected! Confidence: ${(pred.confidence * 100).toFixed(0)}%`, "destructive", recipients);
         }
     }, [current, addAlert]);
 
@@ -377,7 +384,14 @@ export default function Dashboard() {
                                                     <span className={`font-bold ${alert.type === 'destructive' ? 'text-red-800' : 'text-yellow-800'}`}>{alert.type === 'destructive' ? 'Critical Action Needed' : 'Warning'}</span>
                                                     <span className="text-xs text-gray-500 font-bold">{alert.time}</span>
                                                 </div>
-                                                <p className="text-sm text-gray-700 font-medium line-clamp-2">{alert.message}</p>
+                                                <div className="flex flex-col gap-1 items-start mt-1">
+                                                    <p className="text-sm text-gray-700 font-medium line-clamp-1">{alert.message}</p>
+                                                    {alert.recipients && alert.recipients.length > 0 && (
+                                                        <span className="text-[10px] bg-green-100/50 text-green-800 px-2 py-0.5 rounded-full border border-green-200 mt-1 line-clamp-1 text-left font-semibold">
+                                                            📱 WhatsApp sent to {alert.recipients.length} {alert.recipients.length === 1 ? 'number' : 'numbers'}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </button>
                                         </DialogTrigger>
                                         <DialogContent className="sm:max-w-[425px] rounded-3xl pb-8">
@@ -388,13 +402,29 @@ export default function Dashboard() {
                                                 </DialogTitle>
                                             </DialogHeader>
                                             <div className="py-2">
-                                                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 mb-6">
+                                                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 mb-4">
                                                     <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Time of Event</p>
                                                     <p className="text-lg font-extrabold text-gray-900">{alert.time}</p>
                                                 </div>
-                                                <p className="text-lg text-gray-800 font-medium leading-relaxed bg-red-50/50 p-4 border border-red-100 rounded-2xl">
+                                                <p className="text-lg text-gray-800 font-medium leading-relaxed bg-red-50/50 p-4 border border-red-100 rounded-2xl mb-4">
                                                     {alert.message}
                                                 </p>
+                                                {alert.recipients && alert.recipients.length > 0 && (
+                                                    <div className="bg-green-50/50 p-4 rounded-2xl border border-green-100">
+                                                        <p className="text-xs text-green-700 font-bold uppercase tracking-wider mb-2 flex items-center gap-2">
+                                                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-circle"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /></svg>
+                                                            WhatsApp Notification Sent
+                                                        </p>
+                                                        <ul className="space-y-1">
+                                                            {alert.recipients.map((phone, idx) => (
+                                                                <li key={idx} className="text-sm font-medium text-green-900 bg-white px-3 py-1.5 rounded-xl border border-green-100 flex items-center justify-between">
+                                                                    <span>{phone}</span>
+                                                                    <span className="text-[10px] text-green-600 bg-green-50 px-2 py-0.5 font-bold uppercase tracking-wider rounded-full">Delivered</span>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
                                                 <div className="mt-8 pt-6 border-t border-gray-100">
                                                     <p className="text-sm text-gray-600 font-medium flex items-start gap-2">
                                                         <Settings className="w-5 h-5 text-gray-400 shrink-0" />
@@ -411,61 +441,91 @@ export default function Dashboard() {
                 </div>
 
                 {/* System Diagnostics / System Engine Tools */}
-                <details className="group border border-green-200 bg-white shadow-sm rounded-2xl overflow-hidden [&_summary::-webkit-details-marker]:hidden">
-                    <summary className="flex items-center justify-between p-6 cursor-pointer bg-green-50/50 hover:bg-green-100 transition-colors">
-                        <div className="flex items-center gap-3">
-                            <Settings className="w-6 h-6 text-green-700" />
-                            <h3 className="text-xl font-bold text-green-900">Advanced Simulator & Network Details <span className="text-sm font-normal text-green-600 ml-2">(For Testing only)</span></h3>
-                        </div>
-                        <span className="transition group-open:rotate-180">
-                            <svg fill="none" height="24" shapeRendering="geometricPrecision" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
-                        </span>
-                    </summary>
-                    <div className="p-6 border-t border-green-100 space-y-6">
-                        {/* Simulation */}
-                        <div>
-                            <h4 className="font-semibold text-green-800 mb-3">{t("scenarioSimulator")}</h4>
-                            <div className="flex flex-wrap gap-2">
-                                <Button size="lg" variant={scenario === "NORMAL" ? "default" : "outline"} onClick={() => handleSetScenario("NORMAL", 0)} className={scenario === "NORMAL" ? "bg-green-600 hover:bg-green-700 text-white" : ""}>
-                                    {t("scenarioNormal")}
-                                </Button>
-                                <Button size="lg" variant={scenario === "LEAK_NIGHT" ? "destructive" : "outline"} onClick={() => handleSetScenario("LEAK_NIGHT", 1)}>
-                                    {t("scenarioLeak")}
-                                </Button>
-                                <Button size="lg" variant={scenario === "BURST" ? "destructive" : "outline"} onClick={() => handleSetScenario("BURST", 2)}>
-                                    {t("scenarioBurst")}
-                                </Button>
-                                <Button size="lg" variant={scenario === "OVER_IRR" ? "default" : "outline"} onClick={() => handleSetScenario("OVER_IRR", 3)} className={scenario === "OVER_IRR" ? "bg-yellow-500 text-white hover:bg-yellow-600" : ""}>
-                                    {t("scenarioOverIrr")}
-                                </Button>
-                                <Button size="lg" variant={scenario === "UNDER_IRR" ? "destructive" : "outline"} onClick={() => handleSetScenario("UNDER_IRR", 4)}>
-                                    {t("scenarioUnderIrr")}
-                                </Button>
-                                <Button size="lg" variant={scenario === "RAIN" ? "secondary" : "outline"} onClick={() => handleSetScenario("RAIN", 5)}>
-                                    {t("scenarioRain")}
-                                </Button>
-                            </div>
-                        </div>
-
-                        {/* Status indicators */}
-                        <div className="flex flex-wrap gap-4 items-center pt-4 border-t border-green-100">
-                            <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border ${connected ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200"}`}>
-                                {connected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
-                                {connected ? "Connection Live" : "Connection Offline"}
-                            </div>
-
-                            <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-bold ${dbError ? "bg-red-50 border-red-200 text-red-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`}>
-                                Database Status: {dbError ? "Error" : "Online"} ({dbStats?.total_rows?.toLocaleString() ?? "0"} records)
-                            </div>
-
-                            {health && (
-                                <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-green-200 text-sm font-bold text-green-700">
-                                    Backend Engine: {health.status}
+                <div className="flex justify-end mb-4">
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" className="gap-2 bg-white text-green-800 border-green-200 hover:bg-green-50 rounded-xl shadow-sm hover:shadow transition-all">
+                                <Settings className="w-5 h-5" />
+                                {t("settings") || "Settings"}
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px] rounded-3xl">
+                            <DialogHeader>
+                                <DialogTitle className="text-2xl text-green-900 font-bold flex items-center gap-2">
+                                    <Settings className="w-6 h-6 text-green-600" />
+                                    System Settings
+                                </DialogTitle>
+                            </DialogHeader>
+                            <div className="py-6 space-y-6">
+                                <div className="flex items-center justify-between bg-green-50/50 p-4 rounded-2xl border border-green-100">
+                                    <div className="space-y-0.5">
+                                        <h4 className="font-bold text-green-900">Developer Debug Mode</h4>
+                                        <p className="text-sm text-green-700/80 font-medium">Show advanced simulator tools.</p>
+                                    </div>
+                                    <Switch checked={showDebug} onCheckedChange={setShowDebug} />
                                 </div>
-                            )}
+                            </div>
+                        </DialogContent>
+                    </Dialog>
+                </div>
+
+                {showDebug && (
+                    <details className="group border border-emerald-200 bg-white shadow-sm rounded-2xl overflow-hidden [&_summary::-webkit-details-marker]:hidden" open>
+                        <summary className="flex items-center justify-between p-6 cursor-pointer bg-emerald-50 hover:bg-emerald-100 transition-colors">
+                            <div className="flex items-center gap-3">
+                                <Settings className="w-6 h-6 text-green-700" />
+                                <h3 className="text-xl font-bold text-green-900">Advanced Simulator & Network Details <span className="text-sm font-normal text-green-600 ml-2">(For Testing only)</span></h3>
+                            </div>
+                            <span className="transition group-open:rotate-180">
+                                <svg fill="none" height="24" shapeRendering="geometricPrecision" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
+                            </span>
+                        </summary>
+                        <div className="p-6 border-t border-green-100 space-y-6">
+                            {/* Simulation */}
+                            <div>
+                                <h4 className="font-semibold text-green-800 mb-3">{t("scenarioSimulator")}</h4>
+                                <div className="flex flex-wrap gap-2">
+                                    <Button size="lg" variant={scenario === "NORMAL" ? "default" : "outline"} onClick={() => handleSetScenario("NORMAL", 0)} className={scenario === "NORMAL" ? "bg-green-600 hover:bg-green-700 text-white" : ""}>
+                                        {t("scenarioNormal")}
+                                    </Button>
+                                    <Button size="lg" variant={scenario === "LEAK_NIGHT" ? "destructive" : "outline"} onClick={() => handleSetScenario("LEAK_NIGHT", 1)}>
+                                        {t("scenarioLeak")}
+                                    </Button>
+                                    <Button size="lg" variant={scenario === "BURST" ? "destructive" : "outline"} onClick={() => handleSetScenario("BURST", 2)}>
+                                        {t("scenarioBurst")}
+                                    </Button>
+                                    <Button size="lg" variant={scenario === "OVER_IRR" ? "default" : "outline"} onClick={() => handleSetScenario("OVER_IRR", 3)} className={scenario === "OVER_IRR" ? "bg-yellow-500 text-white hover:bg-yellow-600" : ""}>
+                                        {t("scenarioOverIrr")}
+                                    </Button>
+                                    <Button size="lg" variant={scenario === "UNDER_IRR" ? "destructive" : "outline"} onClick={() => handleSetScenario("UNDER_IRR", 4)}>
+                                        {t("scenarioUnderIrr")}
+                                    </Button>
+                                    <Button size="lg" variant={scenario === "RAIN" ? "secondary" : "outline"} onClick={() => handleSetScenario("RAIN", 5)}>
+                                        {t("scenarioRain")}
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Status indicators */}
+                            <div className="flex flex-wrap gap-4 items-center pt-4 border-t border-green-100">
+                                <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border ${connected ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200"}`}>
+                                    {connected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
+                                    {connected ? "Connection Live" : "Connection Offline"}
+                                </div>
+
+                                <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-bold ${dbError ? "bg-red-50 border-red-200 text-red-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`}>
+                                    Database Status: {dbError ? "Error" : "Online"} ({dbStats?.total_rows?.toLocaleString() ?? "0"} records)
+                                </div>
+
+                                {health && (
+                                    <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-green-200 text-sm font-bold text-green-700">
+                                        Backend Engine: {health.status}
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                </details>
+                    </details>
+                )}
             </div>
         </div>
     );

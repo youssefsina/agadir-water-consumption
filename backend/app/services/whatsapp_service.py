@@ -103,11 +103,14 @@ def send_alert(device_id: str, event_type: str, data: dict) -> dict:
     Send an irrigation alert notification to configured recipients.
     Called when webhook receives alert events or AI detects anomalies.
     """
+    import random
+    zone = random.choice(["A", "B", "C", "D"])
     msg = (
-        f"⚠️ *Smart Irrigation Alert*\n\n"
-        f"Device: `{device_id}`\n"
-        f"Event: {event_type}\n"
-        f"Data: {data}\n\n"
-        f"Please check the irrigation system."
+        f"⚠️ *إنذار من السقي الذكي*\n"
+        f"📍 المنطقة (Zone): {zone}\n\n"
+        f"الجهاز (Device): `{device_id}`\n"
+        f"الحدث (Event): {event_type}\n"
+        f"المعلومات (Data): {data}\n\n"
+        f"عافاك طّل على النظام دالسقي دابا للمنطقة {zone}."
     )
     return send_message(msg, recipients=WHATSAPP_DEFAULT_RECIPIENTS or None)

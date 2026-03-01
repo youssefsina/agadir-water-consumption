@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+import random
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
@@ -264,16 +265,18 @@ class PipelineManager:
         if prediction.get("is_anomaly", False):
             if self._whatsapp_cooldown <= 0:
                 recipients = _get_whatsapp_recipients()
+                zone = random.choice(["A", "B", "C", "D"])
                 wa_message = (
-                    f"🚨 *ANOMALY DETECTED*\n\n"
-                    f"🕐 Time: {reading['timestamp']}\n"
-                    f"⚠ Type: {prediction['anomaly_type']}\n"
-                    f"📊 Confidence: {prediction['confidence']:.1%}\n\n"
-                    f"💧 Flow: {reading['flow_lpm']:.1f} L/min\n"
-                    f"🔧 Pressure: {reading['pressure_bar']:.2f} bar\n"
-                    f"🌱 Soil: {reading['soil_moisture_pct']:.1f}%\n"
-                    f"🌡 Temp: {reading['temperature_c']:.1f}°C\n\n"
-                    f"Please check the dashboard immediately."
+                    f"🚨 *إنذار: حالة غير طبيعية اكتشفناها فالسقي*\n"
+                    f"📍 المنطقة (Zone): {zone}\n\n"
+                    f"🕐 الوقت: {reading['timestamp']}\n"
+                    f"⚠ نوع المشكل (Type): {prediction['anomaly_type']}\n"
+                    f"📊 التأكد (Confidence): {prediction['confidence']:.1%}\n\n"
+                    f"💧 تدفق المياه: {reading['flow_lpm']:.1f} L/min\n"
+                    f"🔧 الضغط: {reading['pressure_bar']:.2f} bar\n"
+                    f"🌱 رطوبة التربة: {reading['soil_moisture_pct']:.1f}%\n"
+                    f"🌡 الحرارة: {reading['temperature_c']:.1f}°C\n\n"
+                    f"عافاك طّل على الداشبورد دابا، النظام يقدر يكون فيه شي مشكل فالمنطقة {zone}."
                 )
                 if recipients:
                     wa_result = whatsapp_send_message(wa_message, recipients=recipients)

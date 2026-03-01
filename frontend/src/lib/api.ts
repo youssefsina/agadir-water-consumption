@@ -61,6 +61,12 @@ export interface PipelineEntry {
     server_time: number;
     stats: PipelineStats;
     whatsapp_sent?: boolean;
+    whatsapp_result?: {
+        success: boolean;
+        results: { phone: string; success: boolean; error?: string }[];
+        sent_count?: number;
+        total_count?: number;
+    };
 }
 
 export interface HealthStatus {
