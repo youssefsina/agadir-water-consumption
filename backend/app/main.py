@@ -31,7 +31,7 @@ from app.services.pipeline_service import pipeline_manager, pipeline_store
 from app.supabase_client import supabase_client
 
 # Import routers
-from app.routers import webhook, realtime, data, ai, pipeline
+from app.routers import webhook, realtime, data, ai, pipeline, panel
 
 # ── Startup / Shutdown ────────────────────────────────
 _start_time = time.time()
@@ -51,14 +51,18 @@ async def lifespan(app: FastAPI):
     # Start the IoT → AI → Store → Broadcast pipeline
     await pipeline_manager.start()
 
+    # Share startup time with panel router
+    panel._start_time = _start_time
+
     print("\n" + "=" * 55)
-    print("  ✅  Ready!  Open http://localhost:8000/docs")
+    print("  ✅  Ready!  Open https://agadir-water-consumption-vejs.vercel.app/docs")
+    print("  🎛️  Control Panel: https://agadir-water-consumption-vejs.vercel.app/panel")
     if supabase_client:
         print("  ⚡  Supabase Client connected successfully.")
     else:
         print("  ⚠️  Supabase Client failed to connect.")
     print("  🔄  Pipeline running — IoT data every 30s")
-    print("  📡  Connect: ws://localhost:8000/pipeline/ws")
+    print("  📡  Connect: wss://agadir-water-consumption-vejs.vercel.app/pipeline/ws")
     print("=" * 55 + "\n")
 
     yield
@@ -100,20 +104,27 @@ app.include_router(realtime.router)
 app.include_router(data.router)
 app.include_router(ai.router)
 app.include_router(pipeline.router)
+app.include_router(panel.router)
 
 
 # ── Root & Health ─────────────────────────────────────
 
 @app.get("/", tags=["Health"])
+@app.post("/", tags=["Health"])
 async def root():
-    """API root — basic info."""
+    """API root — basic info. Accepts GET and POST (for systems that POST to base URL)."""
     return {
         "name": "🌊 Smart Irrigation API",
         "version": "1.0.0",
         "docs": "/docs",
         "websocket_endpoints": [
-            "ws://localhost:8000/ws/sensors",
-            "ws://localhost:8000/ws/alerts",
+            "wss://agadir-water-consumption-vejs.vercel.app/ws/sensors",
+            "wss://agadir-water-consumption-vejs.vercel.app/ws/alerts",
+        ],
+        "webhook_endpoints": [
+            "POST /webhook/ingest — IoT sensor data",
+            "POST /webhook/wasenderapi — WaSendAPI inbound",
+            "POST /webhook/whatsapp/send — Send WhatsApp notification",
         ],
     }
 

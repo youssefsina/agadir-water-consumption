@@ -8,3 +8,5 @@ scikit-learn==1.5.2
 supabase
 python-dotenv
 requests
+jinja2
+aiofiles

@@ -17,6 +17,7 @@ from app.config import (
     WHATSAPP_ACCESS_TOKEN,
     WHATSAPP_PHONE_NUMBER_ID,
     WHATSAPP_DEFAULT_RECIPIENTS,
+    WHATSAPP_API_BASE_URL,
 )
 
 
@@ -25,7 +26,7 @@ def _send_via_cloud_api(phone: str, message: str) -> dict:
     if not WHATSAPP_ACCESS_TOKEN or not WHATSAPP_PHONE_NUMBER_ID:
         return {"success": False, "error": "WhatsApp Cloud API not configured"}
 
-    url = f"https://graph.facebook.com/v18.0/{WHATSAPP_PHONE_NUMBER_ID}/messages"
+    url = f"{WHATSAPP_API_BASE_URL}/{WHATSAPP_PHONE_NUMBER_ID}/messages"
     headers = {
         "Authorization": f"Bearer {WHATSAPP_ACCESS_TOKEN}",
         "Content-Type": "application/json",

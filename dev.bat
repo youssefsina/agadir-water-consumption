@@ -40,8 +40,8 @@ echo    [16] Git Pull
 echo    [17] Git Log (last 10)
 echo.
 echo   --- Other ---
-echo    [18] Open API Docs          (http://localhost:8000/docs)
-echo    [19] Open Frontend          (http://localhost:3000)
+echo    [18] Open API Docs          (https://agadir-water-consumption-vejs.vercel.app/docs)
+echo    [19] Open Frontend          (https://agadir-water-consumption-vejs.vercel.app)
 echo    [0]  Exit
 echo.
 echo  ======================================================
@@ -78,14 +78,14 @@ goto MENU
 
 :START_BACKEND
 echo.
-echo  [*] Starting FastAPI backend on http://localhost:8000 ...
+echo  [*] Starting FastAPI backend ...
 start "Backend — FastAPI" cmd /k "cd /d "%BACKEND%" && call Scripts\activate.bat && python run.py --reload"
 echo  [OK] Backend started in a new window.
 goto PAUSE_AND_MENU
 
 :START_FRONTEND
 echo.
-echo  [*] Starting Next.js frontend on http://localhost:3000 ...
+echo  [*] Starting Next.js frontend ...
 start "Frontend — Next.js" cmd /k "cd /d "%FRONTEND%" && npm run dev"
 echo  [OK] Frontend started in a new window.
 goto PAUSE_AND_MENU
@@ -99,9 +99,8 @@ echo  [*] Starting Frontend...
 start "Frontend — Next.js" cmd /k "cd /d "%FRONTEND%" && npm run dev"
 echo.
 echo  [OK] Both servers started.
-echo       Backend  : http://localhost:8000
-echo       API Docs : http://localhost:8000/docs
-echo       Frontend : http://localhost:3000
+echo       Frontend : https://agadir-water-consumption-vejs.vercel.app
+echo       API Docs : https://agadir-water-consumption-vejs.vercel.app/docs
 goto PAUSE_AND_MENU
 
 :: ── Dependencies ───────────────────────────────────────────
@@ -235,13 +234,13 @@ goto PAUSE_AND_MENU
 :OPEN_DOCS
 echo.
 echo  [*] Opening API docs in browser...
-start http://localhost:8000/docs
+start https://agadir-water-consumption-vejs.vercel.app/docs
 goto PAUSE_AND_MENU
 
 :OPEN_FRONTEND_URL
 echo.
 echo  [*] Opening frontend in browser...
-start http://localhost:3000
+start https://agadir-water-consumption-vejs.vercel.app
 goto PAUSE_AND_MENU
 
 :: ── Helpers ────────────────────────────────────────────────

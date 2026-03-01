@@ -5,8 +5,9 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Load .env from backend/ before reading env vars
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(_env_path)
 
 # ── Paths ──────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent          # backend/
@@ -43,10 +44,12 @@ WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "dev-secret-key-change-me")
 # WaSendAPI: secret from dashboard → Webhook settings (for X-Webhook-Signature verification)
 WASENDER_WEBHOOK_SECRET = os.getenv("WASENDER_WEBHOOK_SECRET", "")
 
-# ── WhatsApp (Cloud API) ──────────────────────────────
-# Get from Meta Developer Console: App → WhatsApp → API Setup
+# ── WhatsApp (WaSendAPI / Cloud API) ─────────────────
+# WaSendAPI: API key from https://www.wasenderapi.com
+# Cloud API: Access token + Phone Number ID from Meta Developer Console
 WHATSAPP_ACCESS_TOKEN = os.getenv("WHATSAPP_ACCESS_TOKEN", "")
 WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
+WHATSAPP_API_BASE_URL = os.getenv("WHATSAPP_API_BASE_URL", "https://graph.facebook.com/v19.0")
 # Default recipients for alerts (comma-separated, e.g. "212612345678,212698765432")
 WHATSAPP_DEFAULT_RECIPIENTS = [
     p.strip()
@@ -56,10 +59,7 @@ WHATSAPP_DEFAULT_RECIPIENTS = [
 
 # ── CORS (allow frontend) ─────────────────────────────
 CORS_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:5173",
+    "https://agadir-water-consumption-vejs.vercel.app",
     "*",
 ]
 

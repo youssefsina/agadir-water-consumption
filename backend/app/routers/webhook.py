@@ -208,9 +208,12 @@ async def wasenderapi_webhook(
 @router.post(
     "/whatsapp/send",
     summary="Send WhatsApp notification",
-    description="Send a message to WhatsApp. Connect your AI app to POST here when alerts or anomalies are detected.",
+    description="Send a message to WhatsApp. Connect your AI app to POST here when alerts or anomalies are detected. Optionally include X-Webhook-Signature header for verification when WEBHOOK_SECRET is set.",
 )
-async def send_whatsapp(payload: WhatsAppSendRequest):
+async def send_whatsapp(
+    payload: WhatsAppSendRequest,
+    x_webhook_signature: str = Header(None, alias="X-Webhook-Signature"),
+):
     """
     Outbound webhook for WhatsApp notifications.
 
@@ -223,6 +226,10 @@ async def send_whatsapp(payload: WhatsAppSendRequest):
     Or use recipients for multiple:
         {"message": "Alert!", "recipients": ["212612345678", "212698765432"]}
     """
+    if WEBHOOK_SECRET and x_webhook_signature:
+        if x_webhook_signature != WEBHOOK_SECRET:
+            raise HTTPException(status_code=403, detail="Invalid webhook secret")
+
     result = whatsapp_send_message(
         message=payload.message,
         to=payload.to,

@@ -5,48 +5,37 @@ import { useTranslations } from "next-intl";
 import {
     Card,
     CardContent,
-    CardDescription,
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-    Area,
-    AreaChart,
-    CartesianGrid,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis,
-} from "recharts";
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+
 import {
     Activity,
     Droplets,
     AlertTriangle,
-    CloudRain,
     Thermometer,
     Gauge,
-    Power,
     PowerOff,
     PauseCircle,
-    Clock,
-    ArrowUpRight,
-    ArrowDownRight,
     Settings,
     Wifi,
     WifiOff,
-    Zap,
 } from "lucide-react";
+import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { usePipeline } from "@/hooks/use-pipeline";
+import { useSupabaseData } from "@/hooks/use-supabase-data";
 import {
     setAnomalyType,
     getHealth,
-    getPipelineStatus,
     type HealthStatus,
-    type PipelineStatus,
 } from "@/lib/api";
 
 type Scenario = "NORMAL" | "LEAK_NIGHT" | "BURST" | "OVER_IRR" | "UNDER_IRR" | "RAIN";
@@ -68,14 +57,28 @@ interface ChartPoint {
     anomalyScore: number;
 }
 
+const Sparkline = ({ data, dataKey, color }: { data: ChartPoint[], dataKey: string, color: string }) => (
+    <div className="h-16 w-full mt-4">
+        <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={data}>
+                <defs>
+                    <linearGradient id={`color-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={color} stopOpacity={0.3} />
+                        <stop offset="95%" stopColor={color} stopOpacity={0} />
+                    </linearGradient>
+                </defs>
+                <Area type="monotone" dataKey={dataKey} stroke={color} fillOpacity={1} fill={`url(#color-${dataKey})`} strokeWidth={3} isAnimationActive={false} />
+            </AreaChart>
+        </ResponsiveContainer>
+    </div>
+);
+
 export default function Dashboard() {
     const t = useTranslations("dashboard");
-    const tCommon = useTranslations("common");
 
     const [scenario, setScenario] = useState<Scenario>("NORMAL");
     const [decision, setDecision] = useState<DecisionState>("ON");
     const [alerts, setAlerts] = useState<AlertItem[]>([]);
-    const [chartHistory, setChartHistory] = useState<ChartPoint[]>([]);
     const [currentData, setCurrentData] = useState<ChartPoint>({
         time: "--:--",
         flow: 0,
@@ -84,21 +87,41 @@ export default function Dashboard() {
         temperature: 0,
         anomalyScore: 0,
     });
+    const [chartData, setChartData] = useState<ChartPoint[]>([]);
 
     // Backend status
     const [health, setHealth] = useState<HealthStatus | null>(null);
-    const [pipelineStatus, setPipelineStatus] = useState<PipelineStatus | null>(null);
 
     // Real-time pipeline connection
-    const { current, history, stats, connected } = usePipeline(30);
+    const { current, history, connected } = usePipeline(30);
 
-    // Fetch health and pipeline status periodically
+    // Read-only Supabase data — polls every 30s, works even when backend is offline
+    const { readings: dbReadings, stats: dbStats, error: dbError } = useSupabaseData(60);
+
+    // Use DB data as fallback when pipeline has no history yet
+    useEffect(() => {
+        if (history.length === 0 && dbReadings.length > 0) {
+            const points: ChartPoint[] = dbReadings.slice(-30).map((r) => ({
+                time: new Date(r.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+                flow: r.flow_lpm,
+                pressure: r.pressure_bar,
+                moisture: r.soil_moisture_pct,
+                temperature: r.temperature_c,
+                anomalyScore: r.anomaly_label ? r.anomaly_confidence * 100 : Math.max(5, r.anomaly_confidence * 20),
+            }));
+            setChartData(points);
+            if (points.length > 0) setCurrentData(points[points.length - 1]);
+        }
+    }, [history.length, dbReadings]);
+
+    // Fetch health and pipeline status periodically (non-blocking)
     useEffect(() => {
         const fetchStatus = async () => {
             try {
-                const [h, p] = await Promise.all([getHealth(), getPipelineStatus()]);
-                setHealth(h);
-                setPipelineStatus(p);
+                const [h] = await Promise.all([
+                    getHealth().catch(() => null),
+                ]);
+                if (h) setHealth(h);
             } catch (err) {
                 console.error("Failed to fetch status", err);
             }
@@ -132,7 +155,7 @@ export default function Dashboard() {
                     ? entry.prediction.confidence * 100
                     : Math.max(5, entry.prediction.confidence * 20),
             }));
-            setChartHistory(points);
+            setChartData(points);
             if (points.length > 0) {
                 setCurrentData(points[points.length - 1]);
             }
@@ -179,176 +202,136 @@ export default function Dashboard() {
     };
 
     return (
-        <div className="min-h-screen bg-green-50/50 p-4 md:p-8 font-sans text-green-950">
-            <div className="max-w-7xl mx-auto space-y-6">
-                {/* Header */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div>
-                        <h1 className="text-3xl font-bold text-green-800 flex items-center gap-2">
-                            <Droplets className="w-8 h-8 text-green-600" />
-                            {t("title")}
-                        </h1>
-                        <p className="text-green-700/80 mt-1">{t("subtitle")}</p>
-                    </div>
-                    <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-green-100 shadow-sm">
-                        {/* Connection indicator */}
-                        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold border ${connected
-                            ? "bg-green-50 text-green-700 border-green-200"
-                            : "bg-red-50 text-red-700 border-red-200"
-                            }`}>
-                            {connected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-                            {connected ? "Live" : "Offline"}
+        <div className="min-h-screen bg-green-50/30 p-4 md:p-8 font-sans text-green-950 pt-20">
+            <div className="max-w-5xl mx-auto space-y-8">
+
+                {/* Farmer System Status Banner */}
+                <div className={`rounded-3xl p-6 md:p-10 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm border ${decision === "ON" ? "bg-green-500 border-green-600 text-white" :
+                    decision === "PAUSE" ? "bg-amber-400 border-amber-500 text-amber-950" :
+                        "bg-red-500 border-red-600 text-white"
+                    }`}>
+                    <div className="flex items-center gap-6">
+                        <div className="bg-white/20 p-4 rounded-full">
+                            {decision === "ON" ? <Droplets className="w-12 h-12" /> :
+                                decision === "PAUSE" ? <PauseCircle className="w-12 h-12" /> :
+                                    <PowerOff className="w-12 h-12" />}
                         </div>
-                        <span className="text-sm font-medium text-green-800">{tCommon("systemStatus")}:</span>
-                        {decision === "ON" && (
-                            <Badge className="bg-green-500 hover:bg-green-600 px-3 py-1 text-sm"><Power className="w-4 h-4 ltr:mr-1 rtl:ml-1" /> {t("statusOn")}</Badge>
-                        )}
-                        {decision === "PAUSE" && (
-                            <Badge className="bg-blue-500 hover:bg-blue-600 px-3 py-1 text-sm"><PauseCircle className="w-4 h-4 ltr:mr-1 rtl:ml-1" /> {t("statusPause")}</Badge>
-                        )}
-                        {decision === "STOP" && (
-                            <Badge variant="destructive" className="px-3 py-1 text-sm"><PowerOff className="w-4 h-4 ltr:mr-1 rtl:ml-1" /> {t("statusStop")}</Badge>
-                        )}
+                        <div>
+                            <h2 className="text-3xl md:text-5xl font-extrabold mb-2">
+                                {decision === "ON" ? "Watering is ON" :
+                                    decision === "PAUSE" ? "Watering Paused" :
+                                        "Watering is OFF"}
+                            </h2>
+                            <p className="text-lg md:text-xl opacity-90 font-medium">
+                                {decision === "ON" ? "The crops are getting water right now." :
+                                    decision === "PAUSE" ? "Temporary pause (like rain expected)." :
+                                        "No water is flowing currently."}
+                            </p>
+                        </div>
                     </div>
                 </div>
 
-                {/* Backend Status Bar */}
-                {health && (
-                    <div className="flex flex-wrap gap-3 items-center">
-                        <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-green-100 shadow-sm text-xs">
-                            <Zap className="w-3.5 h-3.5 text-green-500" />
-                            <span className="text-green-700 font-medium">Backend: {health.status}</span>
-                            <span className="text-green-500/70">v{health.version}</span>
+                {/* Important Alerts row */}
+                {alerts.length > 0 && alerts[0].type === "destructive" && (
+                    <div className="bg-red-100 border-2 border-red-500 rounded-2xl p-6 flex items-start gap-4">
+                        <AlertTriangle className="w-10 h-10 text-red-600 shrink-0" />
+                        <div>
+                            <h3 className="text-2xl font-bold text-red-800">Attention Needed!</h3>
+                            <p className="text-lg text-red-900 mt-1">{alerts[0].message}</p>
                         </div>
-                        <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-green-100 shadow-sm text-xs">
-                            <Activity className="w-3.5 h-3.5 text-blue-500" />
-                            <span className="text-green-700 font-medium">Uptime: {Math.floor((health.uptime_seconds || 0) / 60)}m</span>
-                        </div>
-                        <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-green-100 shadow-sm text-xs">
-                            <Droplets className="w-3.5 h-3.5 text-emerald-500" />
-                            <span className="text-green-700 font-medium">{(health.data_rows_loaded || 0).toLocaleString()} data rows</span>
-                        </div>
-                        {stats && (
-                            <>
-                                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-green-100 shadow-sm text-xs">
-                                    <Activity className="w-3.5 h-3.5 text-indigo-500" />
-                                    <span className="text-green-700 font-medium">Pipeline Ticks: {stats.total_readings}</span>
-                                </div>
-                                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border shadow-sm text-xs ${stats.anomaly_rate > 20 ? "bg-red-50 border-red-200" : "bg-white border-green-100"}`}>
-                                    <AlertTriangle className={`w-3.5 h-3.5 ${stats.anomaly_rate > 20 ? "text-red-500" : "text-yellow-500"}`} />
-                                    <span className={`font-medium ${stats.anomaly_rate > 20 ? "text-red-700" : "text-green-700"}`}>Anomaly Rate: {stats.anomaly_rate}%</span>
-                                </div>
-                            </>
-                        )}
                     </div>
                 )}
 
-                {/* Scenario Simulator — sends to real backend */}
-                <Card className="border-green-200 bg-white/80 backdrop-blur">
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-green-800 flex items-center gap-2">
-                            <Settings className="w-4 h-4" />
-                            {t("scenarioSimulator")}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex flex-wrap gap-2">
-                            <Button variant={scenario === "NORMAL" ? "default" : "outline"} onClick={() => handleSetScenario("NORMAL", 0)} className={scenario === "NORMAL" ? "bg-green-600 hover:bg-green-700 text-white" : "border-green-200 text-green-700 hover:bg-green-50"}>
-                                {t("scenarioNormal")}
-                            </Button>
-                            <Button variant={scenario === "LEAK_NIGHT" ? "destructive" : "outline"} onClick={() => handleSetScenario("LEAK_NIGHT", 1)} className={scenario !== "LEAK_NIGHT" ? "border-green-200 text-green-700 hover:bg-red-50 hover:text-red-600 hover:border-red-200" : ""}>
-                                {t("scenarioLeak")}
-                            </Button>
-                            <Button variant={scenario === "BURST" ? "destructive" : "outline"} onClick={() => handleSetScenario("BURST", 2)} className={scenario !== "BURST" ? "border-green-200 text-green-700 hover:bg-red-50 hover:text-red-600 hover:border-red-200" : ""}>
-                                {t("scenarioBurst")}
-                            </Button>
-                            <Button variant={scenario === "OVER_IRR" ? "default" : "outline"} onClick={() => handleSetScenario("OVER_IRR", 3)} className={scenario === "OVER_IRR" ? "bg-yellow-500 hover:bg-yellow-600 text-white" : "border-green-200 text-green-700 hover:bg-yellow-50 hover:text-yellow-700 hover:border-yellow-200"}>
-                                {t("scenarioOverIrr")}
-                            </Button>
-                            <Button variant={scenario === "UNDER_IRR" ? "destructive" : "outline"} onClick={() => handleSetScenario("UNDER_IRR", 4)} className={scenario !== "UNDER_IRR" ? "border-green-200 text-green-700 hover:bg-red-50 hover:text-red-600 hover:border-red-200" : ""}>
-                                {t("scenarioUnderIrr")}
-                            </Button>
-                            <Button variant={scenario === "RAIN" ? "secondary" : "outline"} onClick={() => handleSetScenario("RAIN", 5)} className={scenario === "RAIN" ? "bg-blue-500 hover:bg-blue-600 text-white" : "border-green-200 text-green-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200"}>
-                                {t("scenarioRain")}
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Metrics Grid — from real data */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <Card className="border-green-100 shadow-sm hover:shadow-md transition-shadow">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-green-700">{t("waterFlow")}</CardTitle>
-                            <Activity className="w-4 h-4 text-green-500" />
+                {/* Main 4 Metrics - Huge Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+                    {/* Soil Moisture */}
+                    <Card className="rounded-3xl border-2 border-emerald-100 shadow-sm hover:shadow-md transition-all">
+                        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                            <CardTitle className="text-xl md:text-2xl font-bold text-emerald-800">{t("soilMoisture")}</CardTitle>
+                            <Droplets className="w-8 h-8 text-emerald-500" />
                         </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-green-900">{currentData.flow.toFixed(1)} <span className="text-sm font-normal text-green-600">L/min</span></div>
-                            <p className="text-xs text-green-600/80 mt-1 flex items-center">
-                                {currentData.flow > 100 ? <ArrowUpRight className="w-3 h-3 text-green-500 ltr:mr-1 rtl:ml-1" /> : <ArrowDownRight className="w-3 h-3 text-green-500 ltr:mr-1 rtl:ml-1" />}
-                                {t("fromBaseline")}
-                            </p>
+                        <CardContent className="h-full flex flex-col justify-between group">
+                            <div>
+                                <div className="text-5xl md:text-7xl font-black text-emerald-950 mb-4">{currentData.moisture.toFixed(0)}<span className="text-2xl md:text-4xl text-emerald-600 font-bold ml-1">%</span></div>
+                                <p className="mt-4 text-emerald-700 font-medium text-lg">
+                                    {currentData.moisture < 30 ? "Soil is too dry! Needs water." : currentData.moisture > 60 ? "Soil is very wet." : "Perfect moisture level."}
+                                </p>
+                            </div>
+                            <Sparkline data={chartData} dataKey="moisture" color="#10b981" />
                         </CardContent>
                     </Card>
 
-                    <Card className="border-green-100 shadow-sm hover:shadow-md transition-shadow">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-green-700">{t("pressure")}</CardTitle>
-                            <Gauge className="w-4 h-4 text-blue-500" />
+                    {/* Water Flow */}
+                    <Card className="rounded-3xl border-2 border-blue-100 shadow-sm hover:shadow-md transition-all">
+                        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                            <CardTitle className="text-xl md:text-2xl font-bold text-blue-800">{t("waterFlow")}</CardTitle>
+                            <Activity className="w-8 h-8 text-blue-500" />
                         </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-green-900">{currentData.pressure.toFixed(2)} <span className="text-sm font-normal text-green-600">Bar</span></div>
-                            <p className="text-xs text-green-600/80 mt-1 flex items-center">
-                                {currentData.pressure < 1.5 && <span className="text-red-500 flex items-center"><ArrowDownRight className="w-3 h-3 ltr:mr-1 rtl:ml-1" />{t("criticalDrop")}</span>}
-                                {currentData.pressure >= 1.5 && t("stablePressure")}
-                            </p>
+                        <CardContent className="h-full flex flex-col justify-between group">
+                            <div>
+                                <div className="text-5xl md:text-7xl font-black text-blue-950 mb-4">{currentData.flow.toFixed(0)}<span className="text-lg md:text-2xl text-blue-600 font-bold ml-2 text-wrap">L/min</span></div>
+                                <div className="pt-2">
+                                    <p className="text-blue-700 font-medium text-lg flex items-center gap-2">
+                                        {currentData.flow > 100 ? "Water flowing quickly." : currentData.flow > 0 ? "Water flowing normally." : "No flow detected."}
+                                    </p>
+                                </div>
+                            </div>
+                            <Sparkline data={chartData} dataKey="flow" color="#3b82f6" />
                         </CardContent>
                     </Card>
 
-                    <Card className="border-green-100 shadow-sm hover:shadow-md transition-shadow">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-green-700">{t("soilMoisture")}</CardTitle>
-                            <Droplets className="w-4 h-4 text-emerald-500" />
+                    {/* Pressure */}
+                    <Card className="rounded-3xl border-2 border-indigo-100 shadow-sm hover:shadow-md transition-all">
+                        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                            <CardTitle className="text-xl md:text-2xl font-bold text-indigo-800">{t("pressure")}</CardTitle>
+                            <Gauge className="w-8 h-8 text-indigo-500" />
                         </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-green-900">{currentData.moisture.toFixed(1)} <span className="text-sm font-normal text-green-600">%</span></div>
-                            <Progress value={currentData.moisture} className="h-1 mt-2" indicatorClassName={currentData.moisture > 60 ? "bg-blue-500" : (currentData.moisture < 30 ? "bg-red-500" : "bg-emerald-500")} />
+                        <CardContent className="h-full flex flex-col justify-between group">
+                            <div>
+                                <div className="text-5xl md:text-7xl font-black text-indigo-950 mb-4">{currentData.pressure.toFixed(1)}<span className="text-2xl md:text-4xl text-indigo-600 font-bold ml-2">Bar</span></div>
+                                <p className="text-indigo-700 font-medium text-lg">
+                                    {currentData.pressure < 1.0 ? "Pressure is low! Check pipes." : "Pressure is good."}
+                                </p>
+                            </div>
+                            <Sparkline data={chartData} dataKey="pressure" color="#6366f1" />
                         </CardContent>
                     </Card>
 
-                    <Card className="border-green-100 shadow-sm hover:shadow-md transition-shadow">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-green-700">{t("ambientTemp")}</CardTitle>
-                            <Thermometer className="w-4 h-4 text-orange-500" />
+                    {/* Temperature */}
+                    <Card className="rounded-3xl border-2 border-orange-100 shadow-sm hover:shadow-md transition-all">
+                        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                            <CardTitle className="text-xl md:text-2xl font-bold text-orange-800">{t("ambientTemp")}</CardTitle>
+                            <Thermometer className="w-8 h-8 text-orange-500" />
                         </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-green-900">{currentData.temperature.toFixed(1)} <span className="text-sm font-normal text-green-600">°C</span></div>
-                            <p className="text-xs text-green-600/80 mt-1">
-                                {currentData.temperature < 20 ? t("coolingDown") : t("expectedCurve")}
-                            </p>
+                        <CardContent className="h-full flex flex-col justify-between group">
+                            <div>
+                                <div className="text-5xl md:text-7xl font-black text-orange-950 mb-4">{currentData.temperature.toFixed(0)}<span className="text-2xl md:text-4xl text-orange-600 font-bold ml-2">°C</span></div>
+                                <p className="text-orange-700 font-medium text-lg">
+                                    {currentData.temperature > 35 ? "It's very hot today!" : currentData.temperature < 15 ? "It's a bit cold today." : "Nice mild temperature."}
+                                </p>
+                            </div>
+                            <Sparkline data={chartData} dataKey="temperature" color="#f97316" />
                         </CardContent>
                     </Card>
                 </div>
 
-                {/* Chart & Anomaly */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <Card className="lg:col-span-2 border-green-200 shadow-sm">
-                        <CardHeader>
-                            <CardTitle className="text-green-800">{t("flowPressureHistory")}</CardTitle>
-                            <CardDescription>
-                                {connected ? "🔴 Live data from IoT pipeline" : "⏳ Waiting for connection..."}
-                            </CardDescription>
+                {/* Middle Section: Chart & Alerts */}
+                <div className="flex flex-col gap-6">
+                    {/* Main Chart */}
+                    <Card className="w-full rounded-3xl border-2 border-green-200 shadow-sm hover:shadow-md transition-shadow">
+                        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                            <CardTitle className="text-xl md:text-2xl font-bold text-green-800">Flow & Pressure History</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="h-[300px] w-full mt-4" dir="ltr">
+                            <div className="h-[500px] w-full mt-4 bg-white rounded-2xl p-4 border border-green-50 shadow-inner">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={chartHistory} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+                                    <AreaChart data={chartData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
                                         <defs>
-                                            <linearGradient id="colorFlow" x1="0" y1="0" x2="0" y2="1">
+                                            <linearGradient id="colorFlowMain" x1="0" y1="0" x2="0" y2="1">
                                                 <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
                                                 <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
                                             </linearGradient>
-                                            <linearGradient id="colorPressure" x1="0" y1="0" x2="0" y2="1">
+                                            <linearGradient id="colorPressureMain" x1="0" y1="0" x2="0" y2="1">
                                                 <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
                                                 <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                                             </linearGradient>
@@ -357,116 +340,132 @@ export default function Dashboard() {
                                         <XAxis dataKey="time" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                                         <YAxis yAxisId="left" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                                         <YAxis yAxisId="right" orientation="right" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                                        <Tooltip contentStyle={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} itemStyle={{ color: '#166534' }} />
-                                        <Area yAxisId="left" type="monotone" dataKey="flow" stroke="#22c55e" strokeWidth={2} fillOpacity={1} fill="url(#colorFlow)" name="Flow (L/min)" />
-                                        <Area yAxisId="right" type="monotone" dataKey="pressure" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorPressure)" name="Pressure (Bar)" />
+                                        <Tooltip
+                                            contentStyle={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                            itemStyle={{ color: '#166534' }}
+                                        />
+                                        <Area yAxisId="left" type="monotone" dataKey="flow" stroke="#22c55e" strokeWidth={2} fillOpacity={1} fill="url(#colorFlowMain)" name="Flow (L/min)" isAnimationActive={false} />
+                                        <Area yAxisId="right" type="monotone" dataKey="pressure" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorPressureMain)" name="Pressure (Bar)" isAnimationActive={false} />
                                     </AreaChart>
                                 </ResponsiveContainer>
                             </div>
                         </CardContent>
                     </Card>
 
-                    <div className="flex flex-col gap-6">
-                        <Card className="border-green-200 shadow-sm relative overflow-hidden">
-                            <div className={`absolute top-0 left-0 w-1 h-full ${getAnomalyColor(currentData.anomalyScore)}`}></div>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-green-800 flex items-center justify-between">
-                                    <span>{t("anomalyScore")}</span>
-                                    <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 rounded-md text-xs font-semibold text-green-700 border border-green-100">
-                                        Random Forest
+                    {/* Recent Alerts */}
+                    <Card className="rounded-3xl border-2 border-red-200 shadow-sm flex flex-col hover:shadow-md transition-shadow">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-xl md:text-2xl font-bold text-red-800 flex items-center gap-2">
+                                <AlertTriangle className="w-6 h-6 text-red-600" />
+                                Recent Alerts
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex-1 overflow-y-auto max-h-[400px] mt-2 space-y-3">
+                            {alerts.length === 0 ? (
+                                <div className="text-center text-gray-500 py-12 font-medium">
+                                    <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <Droplets className="w-8 h-8 text-green-500" />
                                     </div>
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="mt-2 text-3xl font-bold flex items-baseline gap-2 text-green-950">
-                                    {currentData.anomalyScore.toFixed(1)}
-                                    <span className="text-sm font-medium text-green-600/80">/ 100</span>
+                                    All systems normal.<br />No recent alerts.
                                 </div>
-                                <Progress value={currentData.anomalyScore} className="h-2 mt-4 bg-green-100" indicatorClassName={getAnomalyColor(currentData.anomalyScore)} />
-                                <p className="text-xs text-green-600/80 mt-3 flex items-center gap-1.5">
-                                    {currentData.anomalyScore > 70 ? (
-                                        <><AlertTriangle className="w-3 h-3 text-red-500 shrink-0" /><span>{t("highProbability")}</span></>
-                                    ) : currentData.anomalyScore > 30 ? (
-                                        <><AlertTriangle className="w-3 h-3 text-yellow-500 shrink-0" /><span>{t("unusualPattern")}</span></>
-                                    ) : (
-                                        <><Activity className="w-3 h-3 text-green-500 shrink-0" /><span>{t("normalOperation")}</span></>
-                                    )}
-                                </p>
-                                {current?.prediction && (
-                                    <div className="mt-3 pt-3 border-t border-green-100 text-xs text-green-700 space-y-1">
-                                        <div className="flex justify-between">
-                                            <span className="text-green-600">Detected Type:</span>
-                                            <span className="font-semibold">{current.prediction.anomaly_type}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-green-600">Ground Truth:</span>
-                                            <span className="font-semibold">{current.ground_truth?.anomaly_type || "–"}</span>
-                                        </div>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        <Card className="flex-1 border-green-200 shadow-sm flex flex-col">
-                            <CardHeader className="pb-3 border-b border-green-100 bg-white/50">
-                                <CardTitle className="text-green-800 text-base">{t("recentAlerts")}</CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-0 flex-1">
-                                <ScrollArea className="h-[200px] w-full">
-                                    {alerts.length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center text-green-600/60 h-full p-6 text-center text-sm">
-                                            <Clock className="w-8 h-8 mb-2 opacity-50" />
-                                            {t("noAlerts")}
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-col">
-                                            {alerts.map((alert) => (
-                                                <div key={alert.id} className="p-4 border-b border-green-50 flex gap-3 items-start hover:bg-green-50/50 transition-colors">
-                                                    <div className={`mt-0.5 rounded-full p-1.5 shrink-0 ${alert.type === 'destructive' ? 'bg-red-100 text-red-600' : alert.type === 'warning' ? 'bg-yellow-100 text-yellow-600' : 'bg-blue-100 text-blue-600'}`}>
-                                                        {alert.type === 'info' ? <CloudRain className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className={`text-sm font-medium ${alert.type === 'destructive' ? 'text-red-900' : alert.type === 'warning' ? 'text-yellow-900' : 'text-blue-900'}`}>{alert.message}</p>
-                                                        <p className="text-xs text-green-600/70 mt-1">{alert.time}</p>
-                                                    </div>
+                            ) : (
+                                alerts.map(alert => (
+                                    <Dialog key={alert.id}>
+                                        <DialogTrigger asChild>
+                                            <button className={`w-full text-left p-4 rounded-xl border cursor-pointer hover:shadow-md transition-all ${alert.type === 'destructive' ? 'bg-red-50 border-red-200 hover:bg-red-100' : 'bg-yellow-50 border-yellow-200 hover:bg-yellow-100'}`}>
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <span className={`font-bold ${alert.type === 'destructive' ? 'text-red-800' : 'text-yellow-800'}`}>{alert.type === 'destructive' ? 'Critical Action Needed' : 'Warning'}</span>
+                                                    <span className="text-xs text-gray-500 font-bold">{alert.time}</span>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </ScrollArea>
-                            </CardContent>
-                        </Card>
-                    </div>
+                                                <p className="text-sm text-gray-700 font-medium line-clamp-2">{alert.message}</p>
+                                            </button>
+                                        </DialogTrigger>
+                                        <DialogContent className="sm:max-w-[425px] rounded-3xl pb-8">
+                                            <DialogHeader>
+                                                <DialogTitle className="flex items-center gap-3 text-2xl pt-2">
+                                                    <AlertTriangle className={`w-8 h-8 ${alert.type === 'destructive' ? 'text-red-600' : 'text-yellow-600'}`} />
+                                                    {alert.type === 'destructive' ? 'Critical Alert' : 'System Warning'}
+                                                </DialogTitle>
+                                            </DialogHeader>
+                                            <div className="py-2">
+                                                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 mb-6">
+                                                    <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Time of Event</p>
+                                                    <p className="text-lg font-extrabold text-gray-900">{alert.time}</p>
+                                                </div>
+                                                <p className="text-lg text-gray-800 font-medium leading-relaxed bg-red-50/50 p-4 border border-red-100 rounded-2xl">
+                                                    {alert.message}
+                                                </p>
+                                                <div className="mt-8 pt-6 border-t border-gray-100">
+                                                    <p className="text-sm text-gray-600 font-medium flex items-start gap-2">
+                                                        <Settings className="w-5 h-5 text-gray-400 shrink-0" />
+                                                        Our AI suggests checking the field immediately to prevent further damage or water loss.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </DialogContent>
+                                    </Dialog>
+                                ))
+                            )}
+                        </CardContent>
+                    </Card>
                 </div>
 
-                {/* Decision Engine Rules */}
-                <Card className="border-green-200 shadow-sm">
-                    <CardHeader>
-                        <CardTitle className="text-green-800 text-lg">{t("decisionRules")}</CardTitle>
-                        <CardDescription>{t("decisionRulesDesc")}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div className="bg-white p-4 rounded-lg border border-green-100 shadow-sm">
-                                <div className="flex items-center gap-2 mb-2"><CloudRain className="w-4 h-4 text-blue-500 shrink-0" /><h3 className="font-semibold text-sm text-green-900">{t("weatherRule")}</h3></div>
-                                <p className="text-xs text-green-700">{t("weatherRuleDesc")}</p>
-                            </div>
-                            <div className="bg-white p-4 rounded-lg border border-green-100 shadow-sm">
-                                <div className="flex items-center gap-2 mb-2"><Droplets className="w-4 h-4 text-emerald-500 shrink-0" /><h3 className="font-semibold text-sm text-green-900">{t("soilRule")}</h3></div>
-                                <p className="text-xs text-green-700">{t("soilRuleDesc1")}</p>
-                                <p className="text-xs text-green-700 mt-1">{t("soilRuleDesc2")}</p>
-                            </div>
-                            <div className="bg-white p-4 rounded-lg border border-green-100 shadow-sm">
-                                <div className="flex items-center gap-2 mb-2"><Activity className="w-4 h-4 text-orange-500 shrink-0" /><h3 className="font-semibold text-sm text-green-900">{t("overIrrRule")}</h3></div>
-                                <p className="text-xs text-green-700">{t("overIrrRuleDesc")}</p>
-                            </div>
-                            <div className="bg-white p-4 rounded-lg border border-green-100 shadow-sm">
-                                <div className="flex items-center gap-2 mb-2"><AlertTriangle className="w-4 h-4 text-red-500 shrink-0" /><h3 className="font-semibold text-sm text-green-900">{t("underIrrRule")}</h3></div>
-                                <p className="text-xs text-green-700">{t("underIrrRuleDesc")}</p>
+                {/* System Diagnostics / System Engine Tools */}
+                <details className="group border border-green-200 bg-white shadow-sm rounded-2xl overflow-hidden [&_summary::-webkit-details-marker]:hidden">
+                    <summary className="flex items-center justify-between p-6 cursor-pointer bg-green-50/50 hover:bg-green-100 transition-colors">
+                        <div className="flex items-center gap-3">
+                            <Settings className="w-6 h-6 text-green-700" />
+                            <h3 className="text-xl font-bold text-green-900">Advanced Simulator & Network Details <span className="text-sm font-normal text-green-600 ml-2">(For Testing only)</span></h3>
+                        </div>
+                        <span className="transition group-open:rotate-180">
+                            <svg fill="none" height="24" shapeRendering="geometricPrecision" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
+                        </span>
+                    </summary>
+                    <div className="p-6 border-t border-green-100 space-y-6">
+                        {/* Simulation */}
+                        <div>
+                            <h4 className="font-semibold text-green-800 mb-3">{t("scenarioSimulator")}</h4>
+                            <div className="flex flex-wrap gap-2">
+                                <Button size="lg" variant={scenario === "NORMAL" ? "default" : "outline"} onClick={() => handleSetScenario("NORMAL", 0)} className={scenario === "NORMAL" ? "bg-green-600 hover:bg-green-700 text-white" : ""}>
+                                    {t("scenarioNormal")}
+                                </Button>
+                                <Button size="lg" variant={scenario === "LEAK_NIGHT" ? "destructive" : "outline"} onClick={() => handleSetScenario("LEAK_NIGHT", 1)}>
+                                    {t("scenarioLeak")}
+                                </Button>
+                                <Button size="lg" variant={scenario === "BURST" ? "destructive" : "outline"} onClick={() => handleSetScenario("BURST", 2)}>
+                                    {t("scenarioBurst")}
+                                </Button>
+                                <Button size="lg" variant={scenario === "OVER_IRR" ? "default" : "outline"} onClick={() => handleSetScenario("OVER_IRR", 3)} className={scenario === "OVER_IRR" ? "bg-yellow-500 text-white hover:bg-yellow-600" : ""}>
+                                    {t("scenarioOverIrr")}
+                                </Button>
+                                <Button size="lg" variant={scenario === "UNDER_IRR" ? "destructive" : "outline"} onClick={() => handleSetScenario("UNDER_IRR", 4)}>
+                                    {t("scenarioUnderIrr")}
+                                </Button>
+                                <Button size="lg" variant={scenario === "RAIN" ? "secondary" : "outline"} onClick={() => handleSetScenario("RAIN", 5)}>
+                                    {t("scenarioRain")}
+                                </Button>
                             </div>
                         </div>
-                    </CardContent>
-                </Card>
+
+                        {/* Status indicators */}
+                        <div className="flex flex-wrap gap-4 items-center pt-4 border-t border-green-100">
+                            <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border ${connected ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200"}`}>
+                                {connected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
+                                {connected ? "Connection Live" : "Connection Offline"}
+                            </div>
+
+                            <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-bold ${dbError ? "bg-red-50 border-red-200 text-red-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`}>
+                                Database Status: {dbError ? "Error" : "Online"} ({dbStats?.total_rows?.toLocaleString() ?? "0"} records)
+                            </div>
+
+                            {health && (
+                                <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-green-200 text-sm font-bold text-green-700">
+                                    Backend Engine: {health.status}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </details>
             </div>
         </div>
     );

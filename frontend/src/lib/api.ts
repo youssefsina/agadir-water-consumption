@@ -1,11 +1,11 @@
 /**
  * 🌊 API Service — Centralized backend communication layer
  * =========================================================
- * Connects to the FastAPI backend at localhost:8000
+ * Connects to the FastAPI backend via NEXT_PUBLIC_API_URL
  * Provides typed fetch wrappers for all REST endpoints + WebSocket helpers.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://agadir-water-consumption-vejs.vercel.app";
 const WS_BASE = API_BASE.replace(/^http/, "ws");
 
 // ── Types ────────────────────────────────────────────────

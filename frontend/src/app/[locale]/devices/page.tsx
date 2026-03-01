@@ -17,6 +17,7 @@ import {
    type WebhookEvent,
    type WhatsAppLogEntry,
 } from "@/lib/api";
+import { useSupabaseData } from "@/hooks/use-supabase-data";
 
 type DeviceStatus = "online" | "offline" | "warning";
 type DeviceType = "Gateway" | "Flow Meter" | "Pressure Sensor" | "Soil Node";
@@ -35,6 +36,9 @@ interface Device {
 export default function DevicesPage() {
    const t = useTranslations('devices');
 
+   // Supabase direct reads (30s poll)
+   const { stats: dbStats, error: dbError, lastFetchedAt: dbLastFetch } = useSupabaseData(10);
+
    const [health, setHealth] = useState<HealthStatus | null>(null);
    const [pipelineStatus, setPipelineStatus] = useState<PipelineStatus | null>(null);
    const [webhookEvents, setWebhookEvents] = useState<WebhookEvent[]>([]);
@@ -46,16 +50,16 @@ export default function DevicesPage() {
       try {
          setLoading(true);
          const [h, ps, we, wa, ss] = await Promise.all([
-            getHealth(),
-            getPipelineStatus(),
-            getWebhookEvents({ limit: 20 }),
-            getWhatsAppLog(),
-            getStreamStatus(),
+            getHealth().catch(() => null),
+            getPipelineStatus().catch(() => null),
+            getWebhookEvents({ limit: 20 }).catch(() => ({ events: [] })),
+            getWhatsAppLog().catch(() => ({ log: [] })),
+            getStreamStatus().catch(() => null),
          ]);
          setHealth(h);
-         setPipelineStatus(ps);
-         setWebhookEvents(we.events);
-         setWhatsappLog(wa.log);
+         if (ps) setPipelineStatus(ps);
+         setWebhookEvents((we as { events: WebhookEvent[] }).events);
+         setWhatsappLog((wa as { log: WhatsAppLogEntry[] }).log);
          setStreamStatus(ss);
       } catch (err) {
          console.error("Devices fetch error", err);
@@ -71,6 +75,16 @@ export default function DevicesPage() {
    }, []);
 
    const devices: Device[] = [
+      {
+         id: "SUPA-DB",
+         name: "Supabase Database (Read-Only)",
+         type: "Gateway",
+         status: dbError ? "offline" : "online",
+         battery: 100,
+         signal: dbError ? -110 : -10,
+         lastSeen: dbStats ? `${dbStats.total_rows.toLocaleString()} rows` : (dbError ? "Error" : "Connecting..."),
+         firmware: "supabase.co",
+      },
       {
          id: "SRV-MAIN",
          name: "FastAPI Backend Server",
@@ -101,7 +115,7 @@ export default function DevicesPage() {
          battery: 100,
          signal: (pipelineStatus?.connected_clients || 0) > 0 ? -50 : -90,
          lastSeen: `${pipelineStatus?.connected_clients || 0} client(s)`,
-         firmware: "ws://localhost:8000",
+         firmware: "wss://agadir-water-consumption-vejs.vercel.app",
       },
       {
          id: "RF-MODEL",
@@ -158,88 +172,156 @@ export default function DevicesPage() {
    };
 
    return (
-      <div className="min-h-screen bg-green-50/50 p-4 md:p-8 font-sans text-green-950">
-         <div className="max-w-6xl mx-auto space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-               <div>
-                  <h1 className="text-3xl font-bold text-green-800 flex items-center gap-2">
-                     <Router className="w-8 h-8 text-slate-600" />
-                     {t('title')}
+      <div className="min-h-screen bg-green-50/30 p-4 md:p-8 font-sans text-green-950 pt-20">
+         <div className="max-w-5xl mx-auto space-y-8">
+
+            {/* Header */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+               <div className="flex flex-col items-start gap-2">
+                  <h1 className="text-4xl md:text-5xl font-extrabold text-green-900 flex items-center gap-3">
+                     <Router className="w-10 h-10 text-slate-600" />
+                     System Health
                   </h1>
-                  <p className="text-green-700/80 mt-1">{t('subtitle')} — Live backend services</p>
+                  <p className="text-xl text-green-700/90 font-medium">Check the connection status of your farm&apos;s smart equipment.</p>
                </div>
-               <Button variant="outline" className="border-green-200 text-green-700 shadow-sm" onClick={fetchAll} disabled={loading}>
-                  {loading ? <Loader2 className="w-4 h-4 ltr:mr-2 rtl:ml-2 animate-spin" /> : <RefreshCw className="w-4 h-4 ltr:mr-2 rtl:ml-2" />}
+               <Button size="lg" variant="outline" className="border-green-300 text-green-800 bg-white hover:bg-green-50 shadow-sm rounded-xl text-base font-bold px-6 py-6" onClick={fetchAll} disabled={loading}>
+                  {loading ? <Loader2 className="w-5 h-5 ltr:mr-2 rtl:ml-2 animate-spin" /> : <RefreshCw className="w-5 h-5 ltr:mr-2 rtl:ml-2" />}
                   {t('pingAll')}
                </Button>
             </div>
 
+            {/* Status Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-               <Card className="border-green-200 shadow-sm">
-                  <CardContent className="p-4 flex items-center gap-4">
-                     <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0"><Router className="w-5 h-5 text-slate-600" /></div>
-                     <div><p className="text-sm font-medium text-slate-600">{t('totalDevices')}</p><p className="text-2xl font-bold">{devices.length}</p></div>
+               <Card className="rounded-3xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all bg-white">
+                  <CardContent className="p-6 flex flex-col items-center text-center gap-3">
+                     <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center shrink-0">
+                        <Router className="w-8 h-8 text-slate-600" />
+                     </div>
+                     <div>
+                        <p className="text-sm font-bold text-slate-500 uppercase tracking-wide">Total Parts</p>
+                        <p className="text-4xl font-extrabold text-slate-800">{devices.length}</p>
+                     </div>
                   </CardContent>
                </Card>
-               <Card className="border-green-200 shadow-sm">
-                  <CardContent className="p-4 flex items-center gap-4">
-                     <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0"><Activity className="w-5 h-5 text-green-600" /></div>
-                     <div><p className="text-sm font-medium text-green-700">{t('onlineDevices')}</p><p className="text-2xl font-bold text-green-700">{onlineCount}</p></div>
+               <Card className="rounded-3xl border-2 border-green-200 shadow-sm hover:shadow-md transition-all bg-white">
+                  <CardContent className="p-6 flex flex-col items-center text-center gap-3">
+                     <div className="w-14 h-14 rounded-2xl bg-green-100 flex items-center justify-center shrink-0">
+                        <Activity className="w-8 h-8 text-green-600" />
+                     </div>
+                     <div>
+                        <p className="text-sm font-bold text-green-600 uppercase tracking-wide">Working Perfect</p>
+                        <p className="text-4xl font-extrabold text-green-700">{onlineCount}</p>
+                     </div>
                   </CardContent>
                </Card>
-               <Card className="border-green-200 shadow-sm">
-                  <CardContent className="p-4 flex items-center gap-4">
-                     <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center shrink-0"><BatteryWarning className="w-5 h-5 text-yellow-600" /></div>
-                     <div><p className="text-sm font-medium text-yellow-700">{t('warnings')}</p><p className="text-2xl font-bold text-yellow-700">{warningCount}</p></div>
+               <Card className="rounded-3xl border-2 border-yellow-200 shadow-sm hover:shadow-md transition-all bg-white">
+                  <CardContent className="p-6 flex flex-col items-center text-center gap-3">
+                     <div className="w-14 h-14 rounded-2xl bg-yellow-100 flex items-center justify-center shrink-0">
+                        <BatteryWarning className="w-8 h-8 text-yellow-600" />
+                     </div>
+                     <div>
+                        <p className="text-sm font-bold text-yellow-600 uppercase tracking-wide">Needs Attention</p>
+                        <p className="text-4xl font-extrabold text-yellow-700">{warningCount}</p>
+                     </div>
                   </CardContent>
                </Card>
-               <Card className="border-green-200 shadow-sm">
-                  <CardContent className="p-4 flex items-center gap-4">
-                     <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0"><WifiOff className="w-5 h-5 text-red-600" /></div>
-                     <div><p className="text-sm font-medium text-red-700">{t('offlineDevices')}</p><p className="text-2xl font-bold text-red-700">{offlineCount}</p></div>
+               <Card className="rounded-3xl border-2 border-red-200 shadow-sm hover:shadow-md transition-all bg-white">
+                  <CardContent className="p-6 flex flex-col items-center text-center gap-3">
+                     <div className="w-14 h-14 rounded-2xl bg-red-100 flex items-center justify-center shrink-0">
+                        <WifiOff className="w-8 h-8 text-red-600" />
+                     </div>
+                     <div>
+                        <p className="text-sm font-bold text-red-600 uppercase tracking-wide">Offline / Broken</p>
+                        <p className="text-4xl font-extrabold text-red-700">{offlineCount}</p>
+                     </div>
                   </CardContent>
                </Card>
             </div>
 
-            <Card className="border-green-200 shadow-sm bg-white overflow-hidden">
+            {/* Devices List Desktop */}
+            <Card className="rounded-3xl border-2 border-green-200 shadow-sm bg-white overflow-hidden hidden md:block">
                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                     <thead className="text-xs text-green-800 uppercase bg-green-50/80 border-b border-green-100">
+                  <table className="w-full text-left">
+                     <thead className="text-sm text-green-800 bg-green-50/80 border-b border-green-100 uppercase tracking-wider font-bold">
                         <tr>
-                           <th className="px-6 py-4 rounded-tl-lg">{t('deviceName')}</th>
-                           <th className="px-6 py-4">{t('type')}</th>
-                           <th className="px-6 py-4">{t('status')}</th>
-                           <th className="px-6 py-4">{t('signal')}</th>
-                           <th className="px-6 py-4">Info</th>
-                           <th className="px-6 py-4 rounded-tr-lg">Version</th>
+                           <th className="px-8 py-6 rounded-tl-lg">Part Name</th>
+                           <th className="px-8 py-6">Status</th>
+                           <th className="px-8 py-6">Connection Strength</th>
+                           <th className="px-8 py-6 rounded-tr-lg">Current Activity</th>
                         </tr>
                      </thead>
-                     <tbody className="divide-y divide-green-50">
-                        {devices.map((device) => (
-                           <tr key={device.id} className="hover:bg-green-50/30 transition-colors">
-                              <td className="px-6 py-4">
-                                 <div className="font-semibold text-green-900">{device.name}</div>
-                                 <div className="text-xs text-green-600/70 font-mono mt-0.5">{device.id}</div>
-                              </td>
-                              <td className="px-6 py-4">
-                                 <div className="flex items-center gap-2 text-slate-700">
-                                    {device.type === 'Gateway' && <Router className="w-4 h-4 text-purple-500" />}
-                                    {device.type === 'Flow Meter' && <Activity className="w-4 h-4 text-blue-500" />}
-                                    {device.type === 'Pressure Sensor' && <Radio className="w-4 h-4 text-amber-500" />}
-                                    {device.type === 'Soil Node' && <Radio className="w-4 h-4 text-emerald-500" />}
-                                    {device.type}
-                                 </div>
-                              </td>
-                              <td className="px-6 py-4">{getStatusBadge(device.status)}</td>
-                              <td className="px-6 py-4">{getSignalBars(device.signal)}</td>
-                              <td className="px-6 py-4 text-slate-600 max-w-[200px] truncate">{device.lastSeen}</td>
-                              <td className="px-6 py-4 text-slate-600 font-mono text-xs">{device.firmware}</td>
-                           </tr>
-                        ))}
+                     <tbody className="divide-y divide-green-50 text-base">
+                        {devices.map((device) => {
+                           // Make names friendlier
+                           let friendlyName = device.name;
+                           if (device.id === "SUPA-DB") friendlyName = "Farm Data Storage";
+                           if (device.id === "SRV-MAIN") friendlyName = "Main Farm Brain (Server)";
+                           if (device.id === "SIM-IOT-1") friendlyName = "Field Sensors Hub";
+                           if (device.id === "WS-PIPE") friendlyName = "Live Connection System";
+                           if (device.id === "RF-MODEL") friendlyName = "AI Smart Predictor";
+                           if (device.id === "WA-SVC") friendlyName = "WhatsApp Alert System";
+
+                           return (
+                              <tr key={device.id} className="hover:bg-green-50/50 transition-colors">
+                                 <td className="px-8 py-5">
+                                    <div className="font-bold text-green-950 text-lg">{friendlyName}</div>
+                                    <div className="text-sm text-green-600/80 mt-1 flex items-center gap-2">
+                                       {device.type === 'Gateway' && <Router className="w-4 h-4 text-purple-500" />}
+                                       {device.type === 'Flow Meter' && <Activity className="w-4 h-4 text-blue-500" />}
+                                       {device.type === 'Pressure Sensor' && <Radio className="w-4 h-4 text-amber-500" />}
+                                       {device.type === 'Soil Node' && <Radio className="w-4 h-4 text-emerald-500" />}
+                                       {device.type}
+                                    </div>
+                                 </td>
+                                 <td className="px-8 py-5">
+                                    <div className="scale-110 origin-left inline-block">
+                                       {getStatusBadge(device.status)}
+                                    </div>
+                                 </td>
+                                 <td className="px-8 py-5">{getSignalBars(device.signal)}</td>
+                                 <td className="px-8 py-5 text-slate-700 font-medium">{device.lastSeen}</td>
+                              </tr>
+                           );
+                        })}
                      </tbody>
                   </table>
                </div>
             </Card>
+
+            {/* Mobile view of devices */}
+            <div className="md:hidden space-y-4">
+               {devices.map((device) => {
+                  let friendlyName = device.name;
+                  if (device.id === "SUPA-DB") friendlyName = "Farm Data Storage";
+                  if (device.id === "SRV-MAIN") friendlyName = "Main Farm Brain (Server)";
+                  if (device.id === "SIM-IOT-1") friendlyName = "Field Sensors Hub";
+                  if (device.id === "WS-PIPE") friendlyName = "Live Connection System";
+                  if (device.id === "RF-MODEL") friendlyName = "AI Smart Predictor";
+                  if (device.id === "WA-SVC") friendlyName = "WhatsApp Alert System";
+
+                  return (
+                     <Card key={device.id} className="rounded-2xl border-2 border-green-100 bg-white p-4">
+                        <div className="flex justify-between items-start mb-3">
+                           <div className="font-bold text-green-950 text-xl">{friendlyName}</div>
+                           <div className="scale-110 origin-right inline-block">
+                              {getStatusBadge(device.status)}
+                           </div>
+                        </div>
+                        <div className="flex flex-col gap-3 text-base text-slate-700">
+                           <div className="flex justify-between border-b pb-2">
+                              <span className="text-slate-500">Connection</span>
+                              {getSignalBars(device.signal)}
+                           </div>
+                           <div className="flex justify-between border-b pb-2">
+                              <span className="text-slate-500">Current Activity</span>
+                              <span className="font-medium text-right">{device.lastSeen}</span>
+                           </div>
+                        </div>
+                     </Card>
+                  )
+               })}
+            </div>
+
          </div>
       </div>
    );

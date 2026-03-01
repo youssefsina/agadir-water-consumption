@@ -550,7 +550,7 @@ yarn dev
 # or
 pnpm dev
 
-# Open browser to http://localhost:3000
+# Open browser to https://agadir-water-consumption-vejs.vercel.app
 ```
 
 ### Desktop Dashboard Setup
@@ -599,7 +599,7 @@ cd ../frontend
 npm run dev
 ```
 
-Visit `http://localhost:3000` and explore:
+Visit `https://agadir-water-consumption-vejs.vercel.app` and explore:
 
 - **Dashboard:** Real-time monitoring
 - **Scenario Simulator:** Test different anomaly types
@@ -804,7 +804,7 @@ Deploy on real farms using **affordable IoT devices** (ESP32, LoRa) and cloud an
 
 ✅ **Data Generation:** `python simulation.py` → 4 CSV files created  
 ✅ **Desktop Dashboard:** `python dashboard.py` → 6 interactive tabs  
-✅ **Web Dashboard:** `npm run dev` → localhost:3000  
+✅ **Web Dashboard:** → https://agadir-water-consumption-vejs.vercel.app  
 ✅ **Scenario Testing:** Test all 6 scenarios (Normal, Leak, Burst, etc.)  
 ✅ **AI Visualization:** View Isolation Forest clustering in Analytics  
 ✅ **ROI Metrics:** Show water/money saved on Analytics page  

@@ -45,9 +45,9 @@ export function usePipeline(maxHistory = 50): PipelineState {
             } else if (data.type === "pipeline_tick") {
                 const entry = data as PipelineEntry;
                 setCurrent(entry);
-                setStats(entry.stats);
+                if (entry.stats) setStats(entry.stats);
                 historyRef.current = [...historyRef.current.slice(-(maxHistory - 1)), entry];
-                setHistory([...historyRef.current]);
+                setHistory(historyRef.current);
             } else if (data.type === "stats") {
                 const msg = data as { type: string; stats: PipelineStats };
                 setStats(msg.stats);
