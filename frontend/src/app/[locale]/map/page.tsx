@@ -4,7 +4,9 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Map as MapIcon, AlertTriangle, Droplets, Info, Wifi, WifiOff } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { Map as MapIcon, AlertTriangle, Droplets, Info, Wifi, WifiOff, Settings } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { usePipeline } from "@/hooks/use-pipeline";
 import { setAnomalyType } from "@/lib/api";
@@ -40,6 +42,7 @@ export default function FarmMapPage() {
     ]);
 
     const [activeAnomaly, setActiveAnomaly] = useState<ZoneId | null>(null);
+    const [showDebug, setShowDebug] = useState<boolean>(false);
 
     useEffect(() => {
         if (!current) return;
@@ -162,40 +165,70 @@ export default function FarmMapPage() {
                 </div>
 
                 {/* System Diagnostics / Testing Tools */}
-                <details className="group border border-emerald-200 bg-white shadow-sm rounded-2xl overflow-hidden [&_summary::-webkit-details-marker]:hidden">
-                    <summary className="flex items-center justify-between p-6 cursor-pointer bg-emerald-50/50 hover:bg-emerald-100 transition-colors">
-                        <div className="flex items-center gap-3">
-                            <Info className="w-6 h-6 text-emerald-700" />
-                            <h3 className="text-xl font-bold text-emerald-900">Map Simulation Tools <span className="text-sm font-normal text-emerald-600 ml-2">(Testing only)</span></h3>
-                        </div>
-                        <span className="transition group-open:rotate-180">
-                            <svg fill="none" height="24" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
-                        </span>
-                    </summary>
-                    <div className="p-6 border-t border-emerald-100 space-y-6">
-                        <div className="flex flex-col gap-3">
-                            <p className="text-emerald-800 font-medium">Click buttons to trigger an alert on the map:</p>
-                            <div className="flex flex-wrap gap-2">
-                                {zones.map(zone => (
-                                    <Button key={`btn-${zone.id}`} size="lg" variant={activeAnomaly === zone.id ? "destructive" : "outline"} className={activeAnomaly !== zone.id ? "border-emerald-200 hover:bg-emerald-50" : ""} onClick={() => triggerAnomaly(zone.id)}>
-                                        {activeAnomaly === zone.id ? "Fix: " : "Break: "}{zone.name}
-                                    </Button>
-                                ))}
-                                <Button size="lg" variant="default" className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                                    onClick={() => { setAnomalyType(0); setActiveAnomaly(null); }}>
-                                    🔄 Reset All
-                                </Button>
+                <div className="flex justify-end mb-4">
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" className="gap-2 bg-white text-emerald-800 border-emerald-200 hover:bg-emerald-50 rounded-xl shadow-sm hover:shadow transition-all">
+                                <Settings className="w-5 h-5" />
+                                System Settings
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px] rounded-3xl">
+                            <DialogHeader>
+                                <DialogTitle className="text-2xl text-emerald-900 font-bold flex items-center gap-2">
+                                    <Settings className="w-6 h-6 text-emerald-600" />
+                                    System Settings
+                                </DialogTitle>
+                            </DialogHeader>
+                            <div className="py-6 space-y-6">
+                                <div className="flex items-center justify-between bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100">
+                                    <div className="space-y-0.5">
+                                        <h4 className="font-bold text-emerald-900">Developer Debug Mode</h4>
+                                        <p className="text-sm text-emerald-700/80 font-medium">Show advanced map simulator tools.</p>
+                                    </div>
+                                    <Switch checked={showDebug} onCheckedChange={setShowDebug} />
+                                </div>
                             </div>
-                        </div>
+                        </DialogContent>
+                    </Dialog>
+                </div>
 
-                        <div className="flex items-center gap-2 pt-4 border-t border-emerald-100">
-                            <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border ${connected ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"}`}>
-                                {connected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
-                                {connected ? "Connection Live" : "Connection Offline"}
+                {showDebug && (
+                    <details className="group border border-emerald-200 bg-white shadow-sm rounded-2xl overflow-hidden [&_summary::-webkit-details-marker]:hidden" open>
+                        <summary className="flex items-center justify-between p-6 cursor-pointer bg-emerald-50/50 hover:bg-emerald-100 transition-colors">
+                            <div className="flex items-center gap-3">
+                                <Info className="w-6 h-6 text-emerald-700" />
+                                <h3 className="text-xl font-bold text-emerald-900">Map Simulation Tools <span className="text-sm font-normal text-emerald-600 ml-2">(Testing only)</span></h3>
+                            </div>
+                            <span className="transition group-open:rotate-180">
+                                <svg fill="none" height="24" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
+                            </span>
+                        </summary>
+                        <div className="p-6 border-t border-emerald-100 space-y-6">
+                            <div className="flex flex-col gap-3">
+                                <p className="text-emerald-800 font-medium">Click buttons to trigger an alert on the map:</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {zones.map(zone => (
+                                        <Button key={`btn-${zone.id}`} size="lg" variant={activeAnomaly === zone.id ? "destructive" : "outline"} className={activeAnomaly !== zone.id ? "border-emerald-200 hover:bg-emerald-50" : ""} onClick={() => triggerAnomaly(zone.id)}>
+                                            {activeAnomaly === zone.id ? "Fix: " : "Break: "}{zone.name}
+                                        </Button>
+                                    ))}
+                                    <Button size="lg" variant="default" className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                        onClick={() => { setAnomalyType(0); setActiveAnomaly(null); }}>
+                                        🔄 Reset All
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-4 border-t border-emerald-100">
+                                <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border ${connected ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"}`}>
+                                    {connected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
+                                    {connected ? "Connection Live" : "Connection Offline"}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </details>
+                    </details>
+                )}
             </div>
         </div>
     );
