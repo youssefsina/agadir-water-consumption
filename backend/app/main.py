@@ -126,6 +126,11 @@ async def root():
             "POST /webhook/wasenderapi — WaSendAPI inbound",
             "POST /webhook/whatsapp/send — Send WhatsApp notification",
         ],
+        "webhook_endpoints": [
+            "POST /webhook/ingest — IoT sensor data",
+            "POST /webhook/wasenderapi — WaSendAPI inbound",
+            "POST /webhook/whatsapp/send — Send WhatsApp notification",
+        ],
     }
 
 

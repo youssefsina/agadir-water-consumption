@@ -1,114 +1,113 @@
 """
-WhatsApp Notification Service
-==============================
-Sends WhatsApp messages via the Meta Cloud API (or logs them in dev mode).
-
-For now, this sends simple messages. In production, configure:
-  - WHATSAPP_ACCESS_TOKEN
-  - WHATSAPP_PHONE_NUMBER_ID
-  - WHATSAPP_DEFAULT_RECIPIENTS
+WhatsApp notification service — sends messages via WaSendAPI.
+API docs: https://www.wasenderapi.com/api/send-message
 """
 from __future__ import annotations
 
+import logging
+import re
+from typing import List, Optional
+
 import requests
-from typing import Optional, List, Dict, Any
 
 from app.config import (
     WHATSAPP_ACCESS_TOKEN,
-    WHATSAPP_PHONE_NUMBER_ID,
     WHATSAPP_DEFAULT_RECIPIENTS,
-    WHATSAPP_API_BASE_URL,
 )
 
+logger = logging.getLogger(__name__)
 
-def _send_via_cloud_api(phone: str, message: str) -> dict:
-    """Send a text message via Meta WhatsApp Cloud API."""
-    if not WHATSAPP_ACCESS_TOKEN or not WHATSAPP_PHONE_NUMBER_ID:
-        return {"success": False, "error": "WhatsApp Cloud API not configured"}
+WASENDERAPI_URL = "https://www.wasenderapi.com/api/send-message"
 
-    url = f"{WHATSAPP_API_BASE_URL}/{WHATSAPP_PHONE_NUMBER_ID}/messages"
-    headers = {
-        "Authorization": f"Bearer {WHATSAPP_ACCESS_TOKEN}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": phone,
-        "type": "text",
-        "text": {"body": message},
-    }
 
-    try:
-        resp = requests.post(url, json=payload, headers=headers, timeout=10)
-        resp.raise_for_status()
-        return {"success": True, "response": resp.json()}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+def _format_phone(phone: str) -> str:
+    """Normalize to E.164: digits only, add + prefix for API."""
+    digits = re.sub(r"[^\d]", "", phone)
+    return f"+{digits}" if digits else ""
 
 
 def send_message(
     message: str,
     to: Optional[str] = None,
     recipients: Optional[List[str]] = None,
-) -> Dict[str, Any]:
+) -> dict:
     """
-    Send a WhatsApp message to one or more recipients.
+    Send a WhatsApp text message via WaSendAPI.
 
     Args:
-        message: text to send
-        to: single phone number (e.g. "+212612345678")
-        recipients: list of phone numbers
+        message: Text to send.
+        to: Single recipient phone (E.164, e.g. "+212612345678" or "212612345678").
+        recipients: List of recipient phones. If provided, overrides `to`.
 
     Returns:
-        dict with success status and details
+        {"success": bool, "results": list, "sent_count": int, "total_count": int}
     """
-    targets = []
-    if to:
-        targets.append(to)
-    if recipients:
-        targets.extend(recipients)
-    if not targets:
-        targets = WHATSAPP_DEFAULT_RECIPIENTS
-
-    if not targets:
-        # Dev mode — just log
-        print(f"📱 [WhatsApp DEV] No recipients configured. Message: {message}")
+    if not WHATSAPP_ACCESS_TOKEN:
         return {
-            "success": True,
-            "dev_mode": True,
-            "message": message,
-            "sent_count": 0,
-            "results": [{"status": "logged_dev_mode", "message": message}],
+            "success": False,
+            "results": [],
+            "error": "WhatsApp not configured. Set WHATSAPP_ACCESS_TOKEN (WaSendAPI API key).",
         }
 
+    phones: List[str] = []
+    if recipients:
+        phones = [_format_phone(r) for r in recipients if _format_phone(r)]
+    elif to:
+        p = _format_phone(to)
+        if p:
+            phones = [p]
+
+    if not phones:
+        return {
+            "success": False,
+            "results": [],
+            "error": "No recipient specified. Provide 'to' or 'recipients' (E.164 format).",
+        }
+
+    headers = {
+        "Authorization": f"Bearer {WHATSAPP_ACCESS_TOKEN}",
+        "Content-Type": "application/json",
+    }
+
     results = []
-    for phone in targets:
-        result = _send_via_cloud_api(phone, message)
-        results.append({"phone": phone, **result})
+    for phone in phones:
+        payload = {"to": phone, "text": message[:4096]}
+        try:
+            resp = requests.post(WASENDERAPI_URL, headers=headers, json=payload, timeout=15)
+            data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
 
-    sent_count = sum(1 for r in results if r.get("success"))
+            if resp.status_code in (200, 201) and data.get("success"):
+                msg_data = data.get("data", {})
+                mid = msg_data.get("msgId") or msg_data.get("jid")
+                results.append({"phone": phone, "success": True, "message_id": str(mid) if mid else None})
+            else:
+                err = data.get("message") or data.get("error") or resp.text
+                results.append({"phone": phone, "success": False, "error": str(err)})
+                logger.warning(f"WaSendAPI send failed to {phone}: {err}")
 
+        except Exception as e:
+            results.append({"phone": phone, "success": False, "error": str(e)})
+            logger.exception(f"WaSendAPI send error to {phone}")
+
+    success_count = sum(1 for r in results if r.get("success"))
     return {
-        "success": sent_count > 0 or len(targets) == 0,
-        "sent_count": sent_count,
-        "total_targets": len(targets),
+        "success": success_count == len(results) and len(results) > 0,
         "results": results,
+        "sent_count": success_count,
+        "total_count": len(results),
     }
 
 
-def send_alert(
-    device_id: str,
-    event_type: str,
-    data: dict,
-) -> Dict[str, Any]:
+def send_alert(device_id: str, event_type: str, data: dict) -> dict:
     """
-    Format and send an alert notification via WhatsApp.
+    Send an irrigation alert notification to configured recipients.
+    Called when webhook receives alert events or AI detects anomalies.
     """
-    message = (
-        f"🚨 *IRRIGATION ALERT*\n\n"
-        f"📌 Device: {device_id}\n"
-        f"⚠ Event: {event_type}\n"
-        f"📊 Details: {data}\n\n"
-        f"Please check the dashboard immediately."
+    msg = (
+        f"⚠️ *Smart Irrigation Alert*\n\n"
+        f"Device: `{device_id}`\n"
+        f"Event: {event_type}\n"
+        f"Data: {data}\n\n"
+        f"Please check the irrigation system."
     )
-    return send_message(message)
+    return send_message(msg, recipients=WHATSAPP_DEFAULT_RECIPIENTS or None)

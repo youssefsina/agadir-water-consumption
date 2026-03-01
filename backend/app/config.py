@@ -44,12 +44,9 @@ WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "dev-secret-key-change-me")
 # WaSendAPI: secret from dashboard → Webhook settings (for X-Webhook-Signature verification)
 WASENDER_WEBHOOK_SECRET = os.getenv("WASENDER_WEBHOOK_SECRET", "")
 
-# ── WhatsApp (WaSendAPI / Cloud API) ─────────────────
-# WaSendAPI: API key from https://www.wasenderapi.com
-# Cloud API: Access token + Phone Number ID from Meta Developer Console
+# ── WhatsApp (WaSendAPI) ──────────────────────────────
+# WaSendAPI API key: https://www.wasenderapi.com
 WHATSAPP_ACCESS_TOKEN = os.getenv("WHATSAPP_ACCESS_TOKEN", "")
-WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
-WHATSAPP_API_BASE_URL = os.getenv("WHATSAPP_API_BASE_URL", "https://graph.facebook.com/v19.0")
 # Default recipients for alerts (comma-separated, e.g. "212612345678,212698765432")
 WHATSAPP_DEFAULT_RECIPIENTS = [
     p.strip()
