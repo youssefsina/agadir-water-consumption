@@ -180,9 +180,9 @@ export default function DevicesPage() {
                <div className="flex flex-col items-start gap-2">
                   <h1 className="text-4xl md:text-5xl font-extrabold text-green-900 flex items-center gap-3">
                      <Router className="w-10 h-10 text-slate-600" />
-                     System Health
+                     {t('title')}
                   </h1>
-                  <p className="text-xl text-green-700/90 font-medium">Check the connection status of your farm&apos;s smart equipment.</p>
+                  <p className="text-xl text-green-700/90 font-medium">{t('desc')}</p>
                </div>
                <Button size="lg" variant="outline" className="border-green-300 text-green-800 bg-white hover:bg-green-50 shadow-sm rounded-xl text-base font-bold px-6 py-6" onClick={fetchAll} disabled={loading}>
                   {loading ? <Loader2 className="w-5 h-5 ltr:mr-2 rtl:ml-2 animate-spin" /> : <RefreshCw className="w-5 h-5 ltr:mr-2 rtl:ml-2" />}
@@ -198,7 +198,7 @@ export default function DevicesPage() {
                         <Router className="w-8 h-8 text-slate-600" />
                      </div>
                      <div>
-                        <p className="text-sm font-bold text-slate-500 uppercase tracking-wide">Total Parts</p>
+                        <p className="text-sm font-bold text-slate-500 uppercase tracking-wide">{t('totalParts')}</p>
                         <p className="text-4xl font-extrabold text-slate-800">{devices.length}</p>
                      </div>
                   </CardContent>
@@ -209,7 +209,7 @@ export default function DevicesPage() {
                         <Activity className="w-8 h-8 text-green-600" />
                      </div>
                      <div>
-                        <p className="text-sm font-bold text-green-600 uppercase tracking-wide">Working Perfect</p>
+                        <p className="text-sm font-bold text-green-600 uppercase tracking-wide">{t('workingPerfect')}</p>
                         <p className="text-4xl font-extrabold text-green-700">{onlineCount}</p>
                      </div>
                   </CardContent>
@@ -220,7 +220,7 @@ export default function DevicesPage() {
                         <BatteryWarning className="w-8 h-8 text-yellow-600" />
                      </div>
                      <div>
-                        <p className="text-sm font-bold text-yellow-600 uppercase tracking-wide">Needs Attention</p>
+                        <p className="text-sm font-bold text-yellow-600 uppercase tracking-wide">{t('needsAttention')}</p>
                         <p className="text-4xl font-extrabold text-yellow-700">{warningCount}</p>
                      </div>
                   </CardContent>
@@ -231,7 +231,7 @@ export default function DevicesPage() {
                         <WifiOff className="w-8 h-8 text-red-600" />
                      </div>
                      <div>
-                        <p className="text-sm font-bold text-red-600 uppercase tracking-wide">Offline / Broken</p>
+                        <p className="text-sm font-bold text-red-600 uppercase tracking-wide">{t('offlineBroken')}</p>
                         <p className="text-4xl font-extrabold text-red-700">{offlineCount}</p>
                      </div>
                   </CardContent>
@@ -244,22 +244,22 @@ export default function DevicesPage() {
                   <table className="w-full text-left">
                      <thead className="text-sm text-green-800 bg-green-50/80 border-b border-green-100 uppercase tracking-wider font-bold">
                         <tr>
-                           <th className="px-8 py-6 rounded-tl-lg">Part Name</th>
-                           <th className="px-8 py-6">Status</th>
-                           <th className="px-8 py-6">Connection Strength</th>
-                           <th className="px-8 py-6 rounded-tr-lg">Current Activity</th>
+                           <th className="px-8 py-6 rounded-tl-lg">{t('partName')}</th>
+                           <th className="px-8 py-6">{t('status')}</th>
+                           <th className="px-8 py-6">{t('connStrength')}</th>
+                           <th className="px-8 py-6 rounded-tr-lg">{t('currentActivity')}</th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-green-50 text-base">
                         {devices.map((device) => {
                            // Make names friendlier
                            let friendlyName = device.name;
-                           if (device.id === "SUPA-DB") friendlyName = "Farm Data Storage";
-                           if (device.id === "SRV-MAIN") friendlyName = "Main Farm Brain (Server)";
-                           if (device.id === "SIM-IOT-1") friendlyName = "Field Sensors Hub";
-                           if (device.id === "WS-PIPE") friendlyName = "Live Connection System";
-                           if (device.id === "RF-MODEL") friendlyName = "AI Smart Predictor";
-                           if (device.id === "WA-SVC") friendlyName = "WhatsApp Alert System";
+                           if (device.id === "SUPA-DB") friendlyName = t('device1');
+                           if (device.id === "SRV-MAIN") friendlyName = t('device2');
+                           if (device.id === "SIM-IOT-1") friendlyName = t('device3');
+                           if (device.id === "WS-PIPE") friendlyName = t('device4');
+                           if (device.id === "RF-MODEL") friendlyName = t('device5');
+                           if (device.id === "WA-SVC") friendlyName = t('device6');
 
                            return (
                               <tr key={device.id} className="hover:bg-green-50/50 transition-colors">
@@ -292,12 +292,12 @@ export default function DevicesPage() {
             <div className="md:hidden space-y-4">
                {devices.map((device) => {
                   let friendlyName = device.name;
-                  if (device.id === "SUPA-DB") friendlyName = "Farm Data Storage";
-                  if (device.id === "SRV-MAIN") friendlyName = "Main Farm Brain (Server)";
-                  if (device.id === "SIM-IOT-1") friendlyName = "Field Sensors Hub";
-                  if (device.id === "WS-PIPE") friendlyName = "Live Connection System";
-                  if (device.id === "RF-MODEL") friendlyName = "AI Smart Predictor";
-                  if (device.id === "WA-SVC") friendlyName = "WhatsApp Alert System";
+                  if (device.id === "SUPA-DB") friendlyName = t('device1');
+                  if (device.id === "SRV-MAIN") friendlyName = t('device2');
+                  if (device.id === "SIM-IOT-1") friendlyName = t('device3');
+                  if (device.id === "WS-PIPE") friendlyName = t('device4');
+                  if (device.id === "RF-MODEL") friendlyName = t('device5');
+                  if (device.id === "WA-SVC") friendlyName = t('device6');
 
                   return (
                      <Card key={device.id} className="rounded-2xl border-2 border-green-100 bg-white p-4">
@@ -309,11 +309,11 @@ export default function DevicesPage() {
                         </div>
                         <div className="flex flex-col gap-3 text-base text-slate-700">
                            <div className="flex justify-between border-b pb-2">
-                              <span className="text-slate-500">Connection</span>
+                              <span className="text-slate-500">{t('connStrength')}</span>
                               {getSignalBars(device.signal)}
                            </div>
                            <div className="flex justify-between border-b pb-2">
-                              <span className="text-slate-500">Current Activity</span>
+                              <span className="text-slate-500">{t('currentActivity')}</span>
                               <span className="font-medium text-right">{device.lastSeen}</span>
                            </div>
                         </div>

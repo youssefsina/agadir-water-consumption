@@ -143,7 +143,7 @@ export default function AnalyticsPage() {
             <div className="min-h-screen bg-green-50/50 p-4 md:p-8 font-sans text-green-950 flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
                     <Loader2 className="w-10 h-10 text-green-600 animate-spin" />
-                    <p className="text-green-700 font-medium">Loading analytics...</p>
+                    <p className="text-green-700 font-medium">{t('loadingAnalytics')}</p>
                 </div>
             </div>
         );
@@ -160,7 +160,7 @@ export default function AnalyticsPage() {
                             <BrainCircuit className="w-10 h-10 text-indigo-600" />
                             {t('title')}
                         </h1>
-                        <p className="text-xl text-green-700/90 font-medium">See how much water and money the smart system is saving you.</p>
+                        <p className="text-xl text-green-700/90 font-medium">{t('systemSummaryDesc').split('.')[0] + '.'}</p>
                     </div>
                     {error && (
                         <Badge variant="destructive" className="px-4 py-2 text-base">
@@ -230,12 +230,12 @@ export default function AnalyticsPage() {
                     <CardHeader className="bg-green-50/50 border-b border-green-100 pb-4">
                         <CardTitle className="text-green-800 text-2xl font-bold flex items-center gap-3">
                             <AlertCircle className="w-8 h-8 text-green-600" />
-                            System Summary
+                            {t('systemSummaryTitle')}
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-6 md:p-8">
                         <p className="text-xl text-green-800 font-medium leading-relaxed">
-                            The smart system relies on its AI to watch the fields 24/7. So far, it has detected <strong>{totalAnomalies}</strong> unusual events like leaks or dry spots, which saved you around <strong>{estimatedLitersSaved} liters</strong> of water and <strong>${estimatedMoneySaved}</strong> in energy. You can rest easy knowing the farm is being monitored constantly.
+                            {t('systemSummaryDesc').replace('{totalAnomalies}', String(totalAnomalies)).replace('{estimatedLitersSaved}', String(estimatedLitersSaved)).replace('{estimatedMoneySaved}', String(estimatedMoneySaved))}
                         </p>
                     </CardContent>
                 </Card>
@@ -245,7 +245,7 @@ export default function AnalyticsPage() {
                     <summary className="flex items-center justify-between p-6 cursor-pointer bg-indigo-50/50 hover:bg-indigo-100 transition-colors">
                         <div className="flex items-center gap-3">
                             <BrainCircuit className="w-6 h-6 text-indigo-700" />
-                            <h3 className="text-xl font-bold text-indigo-900">Advanced AI Diagnostics <span className="text-sm font-normal text-indigo-600 ml-2">(Technical Details)</span></h3>
+                            <h3 className="text-xl font-bold text-indigo-900">{t('advancedAI')} <span className="text-sm font-normal text-indigo-600 ml-2">{t('technicalDetails')}</span></h3>
                         </div>
                         <span className="transition group-open:rotate-180">
                             <svg fill="none" height="24" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
@@ -256,18 +256,18 @@ export default function AnalyticsPage() {
                         {/* The charts */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             <div className="border border-indigo-100 rounded-xl p-4">
-                                <h4 className="font-bold text-indigo-900 mb-4">{t('modelVisualization')} (Live Data)</h4>
+                                <h4 className="font-bold text-indigo-900 mb-4">{t('modelVisualization')} {t('liveData')}</h4>
                                 <div className="h-[300px] w-full">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <ScatterChart margin={{ top: 10, right: 10, bottom: 10, left: -20 }}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                            <XAxis type="number" dataKey="x" name="Flow" unit="L" stroke="#64748b" />
-                                            <YAxis type="number" dataKey="y" name="Pressure" unit="Bar" stroke="#64748b" />
-                                            <ZAxis type="number" dataKey="z" range={[40, 200]} name="Conf%" />
+                                            <XAxis type="number" dataKey="x" name={t('flow')} unit="L" stroke="#64748b" />
+                                            <YAxis type="number" dataKey="y" name={t('pressure')} unit="Bar" stroke="#64748b" />
+                                            <ZAxis type="number" dataKey="z" range={[40, 200]} name={t('conf')} />
                                             <Tooltip cursor={{ strokeDasharray: '3 3' }} />
                                             <Legend />
-                                            <Scatter name={`Normal (${scatterNormal.length})`} data={scatterNormal} fill="#10b981" />
-                                            <Scatter name={`Anomalies (${scatterAnomalies.length})`} data={scatterAnomalies} fill="#ef4444" />
+                                            <Scatter name={`${t('normal')} (${scatterNormal.length})`} data={scatterNormal} fill="#10b981" />
+                                            <Scatter name={`${t('anomalies')} (${scatterAnomalies.length})`} data={scatterAnomalies} fill="#ef4444" />
                                         </ScatterChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -275,7 +275,7 @@ export default function AnalyticsPage() {
 
                             {anomalyBarData.length > 0 && (
                                 <div className="border border-indigo-100 rounded-xl p-4">
-                                    <h4 className="font-bold text-indigo-900 mb-4">Anomaly Types Distribution</h4>
+                                    <h4 className="font-bold text-indigo-900 mb-4">{t('anomalyDist')}</h4>
                                     <div className="h-[300px] w-full">
                                         <ResponsiveContainer width="100%" height="100%">
                                             <BarChart data={anomalyBarData} margin={{ top: 10, right: 10, left: -20, bottom: 10 }}>
@@ -293,7 +293,7 @@ export default function AnalyticsPage() {
 
                         {/* Model status */}
                         <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100">
-                            <h4 className="font-bold text-indigo-900 mb-3 uppercase tracking-wide text-xs">AI Models Loaded ({models.length})</h4>
+                            <h4 className="font-bold text-indigo-900 mb-3 uppercase tracking-wide text-xs">{t('aiModelsLoaded')} ({models.length})</h4>
                             <div className="flex flex-wrap gap-2">
                                 {models.map((m, i) => (
                                     <div key={i} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium ${m.is_loaded ? "bg-white border-green-200 text-green-800" : "bg-white border-red-200 text-red-800"}`}>
@@ -304,7 +304,7 @@ export default function AnalyticsPage() {
                             </div>
                             {stats && (
                                 <p className="text-sm font-medium text-indigo-700 mt-4 border-t border-indigo-100 pt-3">
-                                    Total Dataset Rows Processed: {stats.total_rows?.toLocaleString()}
+                                    {t('datasetRows')} {stats.total_rows?.toLocaleString()}
                                 </p>
                             )}
                         </div>

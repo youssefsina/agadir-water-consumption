@@ -21,20 +21,20 @@ const MotorRow = ({ motor }: { motor: MotorStatus }) => {
 
     let statusBg = "bg-emerald-100 text-emerald-800 border-emerald-300";
     let statusDot = "bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.8)]";
-    let statusText = "Working Perfect";
+    let statusText = t('workingPerfect');
 
     if (motor.status === "WARNING") {
         statusBg = "bg-orange-100 text-orange-800 border-orange-300";
         statusDot = "bg-orange-500 shadow-[0_0_12px_rgba(249,115,22,0.8)] animate-pulse";
-        statusText = "Needs Attention";
+        statusText = t('needsAttention');
     } else if (motor.status === "OFFLINE") {
         statusBg = "bg-red-100 text-red-800 border-red-300";
         statusDot = "bg-red-500";
-        statusText = "Turned Off";
+        statusText = t('turnedOff');
     } else if (motor.status === "MAINTENANCE") {
         statusBg = "bg-blue-100 text-blue-800 border-blue-300";
         statusDot = "bg-blue-500";
-        statusText = "Being Fixed";
+        statusText = t('beingFixed');
     }
 
     const tempColor = motor.temperature > 70 ? 'text-red-600 font-extrabold' : motor.temperature > 50 ? 'text-orange-600 font-extrabold' : 'text-slate-700 font-extrabold';
@@ -55,7 +55,7 @@ const MotorRow = ({ motor }: { motor: MotorStatus }) => {
 
             {/* Title / Name */}
             <div className="flex-1 text-center md:text-left">
-                <div className="text-sm text-slate-400 font-bold uppercase tracking-widest mb-1">PART CODE: {motor.id}</div>
+                <div className="text-sm text-slate-400 font-bold uppercase tracking-widest mb-1">{t('partCode')}: {motor.id}</div>
                 <h3 className="text-3xl font-extrabold text-slate-800 mb-3">{motor.name}</h3>
                 <span className={`inline-flex items-center px-4 py-1.5 rounded-full text-sm font-bold border-2 ${statusBg}`}>
                     {statusText}
@@ -65,19 +65,19 @@ const MotorRow = ({ motor }: { motor: MotorStatus }) => {
             {/* Metrics */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 w-full md:w-auto mt-6 md:mt-0 pt-6 md:pt-0 border-t md:border-t-0 md:border-l-2 border-slate-100 md:pl-8">
                 <div className="flex flex-col items-center md:items-start text-center md:text-left">
-                    <span className="text-sm text-slate-500 font-bold uppercase tracking-wide flex items-center gap-1.5"><Gauge className="w-4 h-4" /> Pressure</span>
+                    <span className="text-sm text-slate-500 font-bold uppercase tracking-wide flex items-center gap-1.5"><Gauge className="w-4 h-4" /> {t('pressure')}</span>
                     <div className="text-3xl font-black text-slate-800 mt-1">{motor.pressure.toFixed(1)} <span className="text-base font-bold text-slate-400">Bar</span></div>
                 </div>
                 <div className="flex flex-col items-center md:items-start text-center md:text-left">
-                    <span className="text-sm text-slate-500 font-bold uppercase tracking-wide flex items-center gap-1.5"><Zap className="w-4 h-4" /> Power Used</span>
+                    <span className="text-sm text-slate-500 font-bold uppercase tracking-wide flex items-center gap-1.5"><Zap className="w-4 h-4" /> {t('powerUsed')}</span>
                     <div className="text-3xl font-black text-slate-800 mt-1">{motor.power.toFixed(1)} <span className="text-base font-bold text-slate-400">kW</span></div>
                 </div>
                 <div className="flex flex-col items-center md:items-start text-center md:text-left">
-                    <span className="text-sm text-slate-500 font-bold uppercase tracking-wide flex items-center gap-1.5"><Thermometer className="w-4 h-4" /> Temp</span>
+                    <span className="text-sm text-slate-500 font-bold uppercase tracking-wide flex items-center gap-1.5"><Thermometer className="w-4 h-4" /> {t('temp')}</span>
                     <div className={`text-3xl mt-1 ${tempColor}`}>{motor.temperature.toFixed(1)} <span className="text-base font-bold opacity-70">°C</span></div>
                 </div>
                 <div className="flex flex-col items-center md:items-start text-center md:text-left">
-                    <span className="text-sm text-slate-500 font-bold uppercase tracking-wide flex items-center gap-1.5"><Activity className="w-4 h-4" /> Health%</span>
+                    <span className="text-sm text-slate-500 font-bold uppercase tracking-wide flex items-center gap-1.5"><Activity className="w-4 h-4" /> {t('healthPerc')}</span>
                     <div className="text-3xl font-black text-slate-800 mt-1">{motor.efficiency}<span className="text-base font-bold text-slate-400">%</span></div>
                 </div>
             </div>
@@ -95,7 +95,7 @@ export default function MotorsPage() {
     const motors: MotorStatus[] = [
         {
             id: "M01",
-            name: "Main Water Pump",
+            name: t('pump1'),
             status: sensorData ? (sensorData.is_irrigating ? "ONLINE" : "OFFLINE") : "OFFLINE",
             pressure: sensorData?.pressure_bar ?? 0,
             power: sensorData ? sensorData.flow_lpm * 0.38 : 0,
@@ -106,7 +106,7 @@ export default function MotorsPage() {
         },
         {
             id: "M02",
-            name: "Field Sprinkler Engine",
+            name: t('pump2'),
             status: sensorData?.is_irrigating ? (sensorData.pressure_bar > 1.5 ? "ONLINE" : "WARNING") : "OFFLINE",
             pressure: sensorData ? sensorData.pressure_bar * 0.9 : 0,
             power: sensorData ? sensorData.flow_lpm * 0.25 : 0,
@@ -117,7 +117,7 @@ export default function MotorsPage() {
         },
         {
             id: "M03",
-            name: "Drip System Pump",
+            name: t('pump3'),
             status: prediction?.is_anomaly ? "WARNING" : (sensorData?.is_irrigating ? "ONLINE" : "OFFLINE"),
             pressure: sensorData ? sensorData.pressure_bar * 1.1 : 0,
             power: sensorData ? sensorData.flow_lpm * 0.45 : 0,
@@ -128,7 +128,7 @@ export default function MotorsPage() {
         },
         {
             id: "M04",
-            name: "Emergency Backup Pump",
+            name: t('pump4'),
             status: prediction?.anomaly_type === "Pipe_Burst" ? "WARNING" : "OFFLINE",
             pressure: prediction?.anomaly_type === "Pipe_Burst" ? (sensorData?.pressure_bar ?? 0) * 0.5 : 0,
             power: prediction?.anomaly_type === "Pipe_Burst" ? (sensorData?.flow_lpm ?? 0) * 0.3 : 0,
@@ -147,9 +147,9 @@ export default function MotorsPage() {
                     <div className="flex flex-col items-start gap-2">
                         <h1 className="text-4xl md:text-5xl font-extrabold text-green-900 flex items-center gap-3">
                             <Droplets className="w-10 h-10 text-emerald-600" />
-                            Water Pumps Status
+                            {t('title')}
                         </h1>
-                        <p className="text-xl text-green-700/90 font-medium">Check the health and activity of your water pumps.</p>
+                        <p className="text-xl text-green-700/90 font-medium">{t('desc')}</p>
                     </div>
                 </div>
 
@@ -157,8 +157,8 @@ export default function MotorsPage() {
                 <div className={`p-6 rounded-3xl border-2 flex items-center gap-4 ${connected ? "bg-emerald-100 border-emerald-300 text-emerald-900" : "bg-red-100 border-red-300 text-red-900"}`}>
                     {connected ? <Wifi className="w-8 h-8 text-emerald-600" /> : <WifiOff className="w-8 h-8 text-red-600" />}
                     <div>
-                        <h2 className="text-2xl font-bold">{connected ? "Pumps Connected" : "Connection Lost"}</h2>
-                        <p className="text-lg font-medium opacity-90">{connected ? "Getting live data from the fields right now." : "Cannot reach the pumps. Check internet connection."}</p>
+                        <h2 className="text-2xl font-bold">{connected ? t('pumpsConnected') : t('connectionLost')}</h2>
+                        <p className="text-lg font-medium opacity-90">{connected ? t('gettingLiveData') : t('cannotReach')}</p>
                     </div>
                 </div>
 
@@ -173,9 +173,9 @@ export default function MotorsPage() {
                 <div className="p-6 bg-white border-2 border-green-100 rounded-3xl flex items-start gap-4 text-green-900">
                     <AlertTriangle className="w-8 h-8 text-green-500 shrink-0 mt-1" />
                     <div>
-                        <h4 className="font-bold text-xl">How to use this page?</h4>
+                        <h4 className="font-bold text-xl">{t('howToUse')}</h4>
                         <p className="text-lg mt-2 text-green-800">
-                            This page shows you exactly what each pump is doing. If a pump is "Working Perfect", you don't need to do anything. If a pump says "Needs Attention", you should check it out as it might be struggling to push water or is getting too hot.
+                            {t('howToUseDesc')}
                         </p>
                     </div>
                 </div>

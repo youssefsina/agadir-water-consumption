@@ -49,13 +49,13 @@ const getFillColor = (status: Zone["status"], isActive: boolean) => {
 
 export default function MapComponent({ zones, activeAnomaly, onZoneClick, isIrrigating }: MapComponentProps) {
     // Center map around the farm bounds
-    const center: [number, number] = [30.155, -9.4255]; // Chtouka Ait Baha, Agadir region
+    const center: [number, number] = [30.1551, -9.4252]; // Chtouka Ait Baha, Agadir region
 
     return (
         <div className="w-full h-[500px] md:h-[600px] z-0 relative isolate rounded-xl overflow-hidden border border-green-200">
             <MapContainer
                 center={center}
-                zoom={15}
+                zoom={17}
                 style={{ width: "100%", height: "100%", zIndex: 0 }}
                 scrollWheelZoom={false}
                 dragging={false}

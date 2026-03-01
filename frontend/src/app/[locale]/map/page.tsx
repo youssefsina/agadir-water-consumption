@@ -35,10 +35,10 @@ export default function FarmMapPage() {
     const isIrrigating = current?.sensor_data?.is_irrigating ?? 0;
 
     const [zones, setZones] = useState<Zone[]>([
-        { id: "north", name: "North Field", type: "Corn", moisture: 45, status: "optimal", bounds: [[30.1560, -9.4270], [30.1580, -9.4240]] },
-        { id: "orchard", name: "East Orchard", type: "Citrus", moisture: 38, status: "optimal", bounds: [[30.1540, -9.4240], [30.1560, -9.4210]] },
-        { id: "south", name: "South Greenhouse", type: "Tomatoes", moisture: 50, status: "optimal", bounds: [[30.1520, -9.4270], [30.1540, -9.4240]] },
-        { id: "west", name: "West Pasture", type: "Alfalfa", moisture: 42, status: "optimal", bounds: [[30.1540, -9.4300], [30.1560, -9.4270]] },
+        { id: "north", name: "North Field", type: "Corn", moisture: 45, status: "optimal", bounds: [[30.1552, -9.4265], [30.1561, -9.4251]] },
+        { id: "orchard", name: "East Orchard", type: "Citrus", moisture: 38, status: "optimal", bounds: [[30.1548, -9.4249], [30.1561, -9.4238]] },
+        { id: "south", name: "South Greenhouse", type: "Tomatoes", moisture: 50, status: "optimal", bounds: [[30.1542, -9.4265], [30.1550, -9.4256]] },
+        { id: "west", name: "West Pasture", type: "Alfalfa", moisture: 42, status: "optimal", bounds: [[30.1542, -9.4254], [30.1550, -9.4245]] },
     ]);
 
     const [activeAnomaly, setActiveAnomaly] = useState<ZoneId | null>(null);
@@ -100,7 +100,7 @@ export default function FarmMapPage() {
                             <MapIcon className="w-10 h-10 text-emerald-600" />
                             {t('title')}
                         </h1>
-                        <p className="text-xl text-green-700/90 font-medium">Check which fields need water right now.</p>
+                        <p className="text-xl text-green-700/90 font-medium">{t('desc')}</p>
                     </div>
                 </div>
 
@@ -109,11 +109,9 @@ export default function FarmMapPage() {
                     <div className="bg-red-100 border-2 border-red-500 rounded-2xl p-6 flex flex-col sm:flex-row items-center sm:items-start gap-4 shadow-sm">
                         <AlertTriangle className="w-12 h-12 text-red-600 shrink-0" />
                         <div>
-                            <h3 className="text-3xl font-bold text-red-800 uppercase tracking-wide">Problem in the Field!</h3>
-                            <p className="text-xl text-red-900 mt-2 font-medium">
-                                We detected an issue: <strong className="font-bold underline">{anomalyType}</strong> in the {activeAnomaly} zone.
-                            </p>
-                            <p className="text-lg text-red-800 mt-1">Please check the map highlighted below.</p>
+                            <h3 className="text-3xl font-bold text-red-800 uppercase tracking-wide">{t('problemTitle')}</h3>
+                            <p className="text-xl text-red-900 mt-2 font-medium" dangerouslySetInnerHTML={{ __html: t('problemDesc').replace('{anomalyType}', anomalyType).replace('{activeAnomaly}', String(activeAnomaly)) }} />
+                            <p className="text-lg text-red-800 mt-1">{t('problemCheck')}</p>
                         </div>
                     </div>
                 )}
@@ -125,9 +123,9 @@ export default function FarmMapPage() {
                             <CardTitle className="text-green-800 text-2xl font-bold flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                                 <span>{t('liveZoneMap')}</span>
                                 <div className="flex gap-2 items-center text-base font-normal">
-                                    <Badge className="bg-orange-100 text-orange-800 border-orange-300 px-3 py-1 text-sm hover:bg-orange-200">Too Dry</Badge>
-                                    <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 px-3 py-1 text-sm hover:bg-emerald-200">Perfect</Badge>
-                                    <Badge className="bg-blue-100 text-blue-800 border-blue-300 px-3 py-1 text-sm hover:bg-blue-200">Too Wet</Badge>
+                                    <Badge className="bg-orange-100 text-orange-800 border-orange-300 px-3 py-1 text-sm hover:bg-orange-200">{t('tooDry')}</Badge>
+                                    <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 px-3 py-1 text-sm hover:bg-emerald-200">{t('perfect')}</Badge>
+                                    <Badge className="bg-blue-100 text-blue-800 border-blue-300 px-3 py-1 text-sm hover:bg-blue-200">{t('tooWet')}</Badge>
                                 </div>
                             </CardTitle>
                         </CardHeader>
@@ -146,16 +144,16 @@ export default function FarmMapPage() {
                             <CardHeader className="pb-3 border-b border-emerald-100">
                                 <CardTitle className="text-emerald-800 text-xl font-bold flex items-center gap-2">
                                     <Droplets className="w-6 h-6 text-emerald-500" />
-                                    Watering Status
+                                    {t('wateringStatus')}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4 pt-4">
                                 <div>
-                                    <p className="text-emerald-600 font-medium mb-1 text-sm uppercase tracking-wide">Flow Rate</p>
+                                    <p className="text-emerald-600 font-medium mb-1 text-sm uppercase tracking-wide">{t('flowRate')}</p>
                                     <p className="text-3xl font-extrabold text-emerald-950">{current?.sensor_data.flow_lpm.toFixed(0) || "0"} <span className="text-lg font-bold text-emerald-700">L/m</span></p>
                                 </div>
                                 <div className="border-t border-emerald-100 pt-3">
-                                    <p className="text-emerald-600 font-medium mb-1 text-sm uppercase tracking-wide">Avg Moisture</p>
+                                    <p className="text-emerald-600 font-medium mb-1 text-sm uppercase tracking-wide">{t('avgMoisture')}</p>
                                     <p className="text-3xl font-extrabold text-emerald-950">{current?.sensor_data.soil_moisture_pct.toFixed(0) || "0"}<span className="text-lg font-bold text-emerald-700">%</span></p>
                                 </div>
                             </CardContent>
@@ -169,7 +167,7 @@ export default function FarmMapPage() {
                         <summary className="flex items-center justify-between p-6 cursor-pointer bg-emerald-50/50 hover:bg-emerald-100 transition-colors">
                             <div className="flex items-center gap-3">
                                 <Info className="w-6 h-6 text-emerald-700" />
-                                <h3 className="text-xl font-bold text-emerald-900">Map Simulation Tools <span className="text-sm font-normal text-emerald-600 ml-2">(Testing only)</span></h3>
+                                <h3 className="text-xl font-bold text-emerald-900">{t('simTools')} <span className="text-sm font-normal text-emerald-600 ml-2">{t('testingOnly')}</span></h3>
                             </div>
                             <span className="transition group-open:rotate-180">
                                 <svg fill="none" height="24" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
@@ -177,16 +175,16 @@ export default function FarmMapPage() {
                         </summary>
                         <div className="p-6 border-t border-emerald-100 space-y-6">
                             <div className="flex flex-col gap-3">
-                                <p className="text-emerald-800 font-medium">Click buttons to trigger an alert on the map:</p>
+                                <p className="text-emerald-800 font-medium">{t('clickTrigger')}</p>
                                 <div className="flex flex-wrap gap-2">
                                     {zones.map(zone => (
                                         <Button key={`btn-${zone.id}`} size="lg" variant={activeAnomaly === zone.id ? "destructive" : "outline"} className={activeAnomaly !== zone.id ? "border-emerald-200 hover:bg-emerald-50" : ""} onClick={() => triggerAnomaly(zone.id)}>
-                                            {activeAnomaly === zone.id ? "Fix: " : "Break: "}{zone.name}
+                                            {activeAnomaly === zone.id ? t('fix') : t('break')}{zone.name}
                                         </Button>
                                     ))}
                                     <Button size="lg" variant="default" className="bg-emerald-600 hover:bg-emerald-700 text-white"
                                         onClick={() => { setAnomalyType(0); setActiveAnomaly(null); }}>
-                                        🔄 Reset All
+                                        {t('resetAll')}
                                     </Button>
                                 </div>
                             </div>
@@ -194,7 +192,7 @@ export default function FarmMapPage() {
                             <div className="flex items-center gap-2 pt-4 border-t border-emerald-100">
                                 <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border ${connected ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"}`}>
                                     {connected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
-                                    {connected ? "Connection Live" : "Connection Offline"}
+                                    {connected ? t('connLive') : t('connOffline')}
                                 </div>
                             </div>
                         </div>

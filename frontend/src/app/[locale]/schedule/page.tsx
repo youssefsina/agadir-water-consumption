@@ -137,7 +137,7 @@ export default function SchedulePage() {
                 zone: "All Zones",
                 status: "skipped",
                 action: `${t('scheduled')}: Irrigation`,
-                reason: `Auto-Skipped: ${(avgRainProb * 100).toFixed(0)}% rain`,
+                reason: `${t('autoSkipped')}: ${(avgRainProb * 100).toFixed(0)}% ${t('rain')}`,
             });
         }
 
@@ -147,14 +147,14 @@ export default function SchedulePage() {
                 zone: ae.prediction.anomaly_type,
                 status: "pending_ai",
                 action: `${t('pendingAI')}: ${ae.prediction.anomaly_type}`,
-                reason: `Confidence: ${(ae.prediction.confidence * 100).toFixed(0)}%`,
+                reason: `${t('confidence')} ${(ae.prediction.confidence * 100).toFixed(0)}%`,
             });
         });
 
         if (events.length === 0) {
             events.push({
                 time: entries.length > 0 ? new Date(entries[0].timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--:--",
-                zone: "All Zones",
+                zone: t('allZones'),
                 status: "completed",
                 action: `${entries.length} readings — Normal`,
             });
@@ -170,7 +170,7 @@ export default function SchedulePage() {
             <div className="min-h-screen bg-green-50/30 p-4 md:p-8 font-sans text-green-950 flex items-center justify-center pt-20">
                 <div className="flex flex-col items-center gap-4 bg-white p-10 rounded-3xl shadow-sm border-2 border-emerald-100">
                     <Loader2 className="w-12 h-12 text-emerald-500 animate-spin" />
-                    <p className="text-xl text-emerald-800 font-bold">Checking watering schedule...</p>
+                    <p className="text-xl text-emerald-800 font-bold">{t('loading')}</p>
                 </div>
             </div>
         );
@@ -184,13 +184,13 @@ export default function SchedulePage() {
                     <div className="flex flex-col items-start gap-2">
                         <h1 className="text-4xl md:text-5xl font-extrabold text-green-900 flex items-center gap-3">
                             <CalendarRange className="w-10 h-10 text-green-600" />
-                            Smart Watering Plan
+                            {t('title')}
                         </h1>
-                        <p className="text-xl text-green-700/90 font-medium">See when your fields were watered and what the AI plans next.</p>
+                        <p className="text-xl text-green-700/90 font-medium">{t('desc')}</p>
                     </div>
                     <div className="bg-blue-50 border-2 border-blue-200 px-5 py-3 rounded-2xl flex items-center gap-3 shadow-sm hover:bg-blue-100 transition-colors cursor-default">
                         <CloudRain className="w-6 h-6 text-blue-500" />
-                        <span className="text-base font-bold text-blue-900">Weather Sync ON</span>
+                        <span className="text-base font-bold text-blue-900">{t('weatherSync')}</span>
                     </div>
                 </div>
 
@@ -199,11 +199,10 @@ export default function SchedulePage() {
                     <div className="relative z-10 w-full md:w-2/3 space-y-3">
                         <h2 className="text-2xl font-extrabold flex items-center gap-3">
                             <Sparkles className="w-6 h-6 text-yellow-300" />
-                            AI Assistant Summary
+                            {t('aiSummaryTitle')}
                         </h2>
                         <p className="text-emerald-50 leading-relaxed text-lg font-medium">
-                            I&apos;ve found <strong>{anomalies.length}</strong> issues recently, and skipped watering <strong>{skippedByRain.length}</strong> times because it was going to rain.
-                            This saved you around <strong>{estimatedLitersSaved.toLocaleString()} liters</strong> of water!
+                            {t('aiSummaryDesc').replace('{anomalies}', String(anomalies.length)).replace('{skipped}', String(skippedByRain.length)).replace('{liters}', estimatedLitersSaved.toLocaleString())}
                         </p>
                     </div>
                     <CloudRain className="absolute -right-6 -bottom-6 w-48 h-48 text-emerald-300 opacity-20 rotate-12" />
@@ -213,7 +212,7 @@ export default function SchedulePage() {
                 <div className="space-y-6">
                     {scheduleData.length === 0 ? (
                         <Card className="rounded-3xl border-2 border-green-200 shadow-sm p-12 text-center text-green-600/70 bg-white">
-                            <p className="text-xl font-bold">{t('noActions') || "No history available yet."}</p>
+                            <p className="text-xl font-bold">{t('noActions')}</p>
                         </Card>
                     ) : (
                         scheduleData.map((day, idx) => (
