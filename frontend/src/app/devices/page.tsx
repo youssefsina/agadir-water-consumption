@@ -101,7 +101,7 @@ export default function DevicesPage() {
          battery: 100,
          signal: (pipelineStatus?.connected_clients || 0) > 0 ? -50 : -90,
          lastSeen: `${pipelineStatus?.connected_clients || 0} client(s) connected`,
-         firmware: "ws://localhost:8000",
+         firmware: "wss://agadir-water-consumption-vejs.vercel.app",
       },
       {
          id: "WS-STREAM",
@@ -111,7 +111,7 @@ export default function DevicesPage() {
          battery: 100,
          signal: streamStatus?.active_connections ? -50 : -90,
          lastSeen: `${streamStatus?.active_connections || 0} active streams`,
-         firmware: "ws://localhost:8000",
+         firmware: "wss://agadir-water-consumption-vejs.vercel.app",
       },
       {
          id: "RF-MODEL",

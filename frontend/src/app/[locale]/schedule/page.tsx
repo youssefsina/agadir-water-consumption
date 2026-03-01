@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CalendarRange, CloudRain, Sun, Cloud, ThermometerSun, AlertCircle, Sparkles, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { getPipelineHistory, type PipelineEntry } from "@/lib/api";
+import { useSupabaseData } from "@/hooks/use-supabase-data";
 
 interface ScheduleEvent {
     time: string;
@@ -30,19 +31,22 @@ interface DaySchedule {
 
 export default function SchedulePage() {
     const t = useTranslations('schedule');
-    const [pipelineData, setPipelineData] = useState<PipelineEntry[]>([]);
-    const [loading, setLoading] = useState(true);
+    // ── Supabase direct reads (30s poll) ──────────────────
+    const { readings: dbReadings, loading: dbLoading } = useSupabaseData(100);
+
+    const [backendData, setBackendData] = useState<PipelineEntry[]>([]);
+    const [backendLoading, setBackendLoading] = useState(true);
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                setLoading(true);
-                const res = await getPipelineHistory(100);
-                setPipelineData(res.data);
+                setBackendLoading(true);
+                const res = await getPipelineHistory(100).catch(() => ({ data: [] }));
+                setBackendData(res.data);
             } catch (err) {
                 console.error("Schedule fetch error", err);
             } finally {
-                setLoading(false);
+                setBackendLoading(false);
             }
         };
         fetchData();
@@ -50,7 +54,37 @@ export default function SchedulePage() {
         return () => clearInterval(timer);
     }, []);
 
-    const totalEntries = pipelineData.length;
+    // Merge: prefer backend pipeline data, fall back to DB readings
+    const pipelineData: PipelineEntry[] = backendData.length > 0
+        ? backendData
+        : dbReadings.map((r) => ({
+            type: "db",
+            timestamp: r.timestamp,
+            tick: r.id,
+            sensor_data: {
+                flow_lpm: r.flow_lpm,
+                pressure_bar: r.pressure_bar,
+                soil_moisture_pct: r.soil_moisture_pct,
+                temperature_c: r.temperature_c,
+                rain_probability: r.rain_probability,
+                hour_of_day: r.hour_of_day,
+                is_irrigating: r.is_irrigating,
+            },
+            prediction: {
+                anomaly_id: r.anomaly_label,
+                anomaly_type: r.anomaly_type,
+                is_anomaly: r.anomaly_label !== 0,
+                confidence: r.anomaly_confidence,
+                probabilities: {},
+            },
+            ground_truth: { anomaly_label: r.anomaly_label, anomaly_type: r.anomaly_type },
+            server_time: 0,
+            stats: { total_readings: 0, stored_readings: 0, anomaly_count: 0, anomaly_rate: 0, last_anomaly: null, whatsapp_messages_sent: 0 },
+        }));
+
+    const loading = dbLoading && backendLoading;
+
+
     const anomalies = pipelineData.filter(e => e.prediction.is_anomaly);
     const skippedByRain = pipelineData.filter(e => e.sensor_data.rain_probability > 0.6 && !e.sensor_data.is_irrigating);
     const estimatedLitersSaved = skippedByRain.length * 30 * 120;
@@ -133,101 +167,108 @@ export default function SchedulePage() {
 
     if (loading && pipelineData.length === 0) {
         return (
-            <div className="min-h-screen bg-green-50/50 p-4 md:p-8 font-sans text-green-950 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="w-10 h-10 text-green-600 animate-spin" />
-                    <p className="text-green-700 font-medium">Loading schedule...</p>
+            <div className="min-h-screen bg-green-50/30 p-4 md:p-8 font-sans text-green-950 flex items-center justify-center pt-20">
+                <div className="flex flex-col items-center gap-4 bg-white p-10 rounded-3xl shadow-sm border-2 border-emerald-100">
+                    <Loader2 className="w-12 h-12 text-emerald-500 animate-spin" />
+                    <p className="text-xl text-emerald-800 font-bold">Checking watering schedule...</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-green-50/50 p-4 md:p-8 font-sans text-green-950">
-            <div className="max-w-4xl mx-auto space-y-6">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div>
-                        <h1 className="text-3xl font-bold text-green-800 flex items-center gap-2">
-                            <CalendarRange className="w-8 h-8 text-green-600" />
-                            {t('title')}
+        <div className="min-h-screen bg-green-50/30 p-4 md:p-8 font-sans text-green-950 pt-20">
+            <div className="max-w-4xl mx-auto space-y-8">
+                {/* Header */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                    <div className="flex flex-col items-start gap-2">
+                        <h1 className="text-4xl md:text-5xl font-extrabold text-green-900 flex items-center gap-3">
+                            <CalendarRange className="w-10 h-10 text-green-600" />
+                            Smart Watering Plan
                         </h1>
-                        <p className="text-green-700/80 mt-1">{t('subtitle')} — {totalEntries} readings</p>
+                        <p className="text-xl text-green-700/90 font-medium">See when your fields were watered and what the AI plans next.</p>
                     </div>
-                    <div className="bg-blue-50 border border-blue-200 px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm">
-                        <CloudRain className="w-5 h-5 text-blue-500" />
-                        <span className="text-sm font-semibold text-blue-900">{t('weatherSyncActive')}</span>
+                    <div className="bg-blue-50 border-2 border-blue-200 px-5 py-3 rounded-2xl flex items-center gap-3 shadow-sm hover:bg-blue-100 transition-colors cursor-default">
+                        <CloudRain className="w-6 h-6 text-blue-500" />
+                        <span className="text-base font-bold text-blue-900">Weather Sync ON</span>
                     </div>
                 </div>
 
-                <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl p-6 text-white shadow-md relative overflow-hidden">
-                    <div className="relative z-10 w-full md:w-2/3">
-                        <h2 className="text-xl font-bold flex items-center gap-2 mb-2">
-                            <Sparkles className="w-5 h-5 text-yellow-300" />
-                            {t('aiSummaryTitle')}
+                {/* AI Summary Banner */}
+                <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-3xl p-8 text-white shadow-md relative overflow-hidden">
+                    <div className="relative z-10 w-full md:w-2/3 space-y-3">
+                        <h2 className="text-2xl font-extrabold flex items-center gap-3">
+                            <Sparkles className="w-6 h-6 text-yellow-300" />
+                            AI Assistant Summary
                         </h2>
-                        <p className="text-emerald-50 leading-relaxed text-sm">
-                            {anomalies.length} anomalies detected, {skippedByRain.length} irrigation cycles skipped for rain.
-                            Estimated {estimatedLitersSaved.toLocaleString()} liters saved.
+                        <p className="text-emerald-50 leading-relaxed text-lg font-medium">
+                            I&apos;ve found <strong>{anomalies.length}</strong> issues recently, and skipped watering <strong>{skippedByRain.length}</strong> times because it was going to rain.
+                            This saved you around <strong>{estimatedLitersSaved.toLocaleString()} liters</strong> of water!
                         </p>
                     </div>
-                    <CloudRain className="absolute -right-4 -bottom-4 w-32 h-32 text-emerald-500/30 rotate-12" />
+                    <CloudRain className="absolute -right-6 -bottom-6 w-48 h-48 text-emerald-300 opacity-20 rotate-12" />
                 </div>
 
-                <div className="space-y-4">
+                {/* Schedule List */}
+                <div className="space-y-6">
                     {scheduleData.length === 0 ? (
-                        <Card className="border-green-200 shadow-sm p-8 text-center text-green-600/70">
-                            <p>{t('noActions')}</p>
+                        <Card className="rounded-3xl border-2 border-green-200 shadow-sm p-12 text-center text-green-600/70 bg-white">
+                            <p className="text-xl font-bold">{t('noActions') || "No history available yet."}</p>
                         </Card>
                     ) : (
                         scheduleData.map((day, idx) => (
-                            <Card key={idx} className="border-green-200 shadow-sm overflow-hidden">
+                            <Card key={idx} className="rounded-3xl border-2 border-green-200 shadow-sm overflow-hidden bg-white hover:shadow-md transition-shadow">
                                 <div className="flex flex-col md:flex-row">
-                                    <div className="bg-emerald-50 md:w-48 p-4 border-b md:border-b-0 md:border-r border-green-100 flex md:flex-col items-center justify-between md:justify-center text-center gap-2">
+                                    {/* Weather/Date Block */}
+                                    <div className="bg-emerald-50 md:w-56 p-6 border-b md:border-b-0 md:border-r-2 border-green-100 flex md:flex-col items-center justify-between md:justify-center text-center gap-4">
                                         <div>
-                                            <p className="font-bold text-green-900">{day.day}</p>
-                                            <p className="text-xs text-green-700/70">{day.date}</p>
+                                            <p className="text-xl font-extrabold text-green-950">{day.day}</p>
+                                            <p className="text-sm font-bold text-green-700 mt-1 uppercase tracking-widest">{day.date}</p>
                                         </div>
-                                        <day.weather.icon className={`w-8 h-8 ${day.weather.color}`} />
+                                        <div className="p-4 bg-white rounded-2xl shadow-sm border border-emerald-100/50">
+                                            <day.weather.icon className={`w-10 h-10 ${day.weather.color}`} />
+                                        </div>
                                         <div>
-                                            <p className="text-xl font-bold text-green-950">{day.weather.temp}</p>
-                                            <p className="text-xs font-semibold text-blue-600 flex items-center justify-center gap-1">
-                                                <CloudRain className="w-3 h-3" /> {day.weather.rainChance}
+                                            <p className="text-3xl font-black text-green-950">{day.weather.temp}</p>
+                                            <p className="text-sm font-bold text-blue-600 flex items-center justify-center gap-1.5 mt-1 border border-blue-200 bg-blue-50 px-3 py-1 rounded-full">
+                                                <CloudRain className="w-4 h-4" /> {day.weather.rainChance} Rain
                                             </p>
                                         </div>
                                     </div>
 
+                                    {/* Events Block */}
                                     <div className="flex-1 p-0">
-                                        <div className="divide-y divide-green-50">
+                                        <div className="divide-y-2 divide-green-50/80 h-full flex flex-col justify-center">
                                             {day.events.map((ev, evIdx) => (
-                                                <div key={evIdx} className={`p-4 flex flex-col md:flex-row gap-4 items-start md:items-center ${ev.status === 'skipped' ? 'bg-red-50/30' : ''}`}>
-                                                    <div className="w-24 shrink-0 font-medium text-green-900 text-sm">{ev.time}</div>
-                                                    <div className="w-32 shrink-0">
-                                                        <Badge variant="outline" className="text-green-800 border-green-200 bg-white">{ev.zone}</Badge>
+                                                <div key={evIdx} className={`p-6 flex flex-col md:flex-row gap-6 items-start md:items-center ${ev.status === 'skipped' ? 'bg-red-50/40' : 'hover:bg-slate-50 transition-colors'}`}>
+                                                    <div className="w-24 shrink-0 font-extrabold text-green-900 text-lg">{ev.time}</div>
+                                                    <div className="w-40 shrink-0">
+                                                        <Badge className="text-base px-4 py-1.5 text-green-800 border-green-300 bg-white shadow-sm font-bold">{ev.zone}</Badge>
                                                     </div>
                                                     <div className="flex-1">
                                                         {ev.status === "completed" && (
-                                                            <span className="text-green-700 text-sm flex items-center gap-2">
-                                                                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                                                            <span className="text-green-800 text-lg font-bold flex items-center gap-3">
+                                                                <div className="w-4 h-4 rounded-full bg-green-500 shadow-sm border-2 border-white"></div>
                                                                 {ev.action}
                                                             </span>
                                                         )}
                                                         {ev.status === "scheduled" && (
-                                                            <span className="text-green-600/80 text-sm flex items-center gap-2">
-                                                                <div className="w-2 h-2 rounded-full bg-blue-300"></div>
+                                                            <span className="text-blue-800 text-lg font-bold flex items-center gap-3">
+                                                                <div className="w-4 h-4 rounded-full bg-blue-400 shadow-sm border-2 border-white"></div>
                                                                 {ev.action}
                                                             </span>
                                                         )}
                                                         {ev.status === "pending_ai" && (
-                                                            <div className="text-orange-600 text-sm">
-                                                                <span className="flex items-center gap-2 font-medium"><Sparkles className="w-3 h-3" /> {ev.action}</span>
-                                                                <p className="text-xs mt-1 text-orange-600/70">{ev.reason}</p>
+                                                            <div className="text-orange-700">
+                                                                <span className="flex items-center gap-3 text-lg font-bold"><Sparkles className="w-5 h-5" /> {ev.action}</span>
+                                                                <p className="text-base mt-2 text-orange-800/80 font-medium">Auto-detected details: {ev.reason}</p>
                                                             </div>
                                                         )}
                                                         {ev.status === "skipped" && (
                                                             <div>
-                                                                <span className="text-gray-400 line-through text-sm">{ev.action}</span>
-                                                                <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-red-600 bg-red-100/50 w-max px-2 py-1 rounded-md border border-red-100">
-                                                                    <AlertCircle className="w-3 h-3" />{ev.reason}
+                                                                <span className="text-gray-400 line-through text-lg font-bold">{ev.action}</span>
+                                                                <div className="mt-3 flex items-center gap-2 text-base font-bold text-red-700 bg-red-100 w-max px-4 py-2 rounded-xl border border-red-200 shadow-sm">
+                                                                    <AlertCircle className="w-5 h-5" />{ev.reason}
                                                                 </div>
                                                             </div>
                                                         )}

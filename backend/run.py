@@ -21,7 +21,7 @@ def main():
 
     uvicorn.run(
         "app.main:app",
-        host="localhost",
+        host="0.0.0.0",
         port=args.port,
         reload=args.reload,
         reload_dirs=["app"] if args.reload else None,

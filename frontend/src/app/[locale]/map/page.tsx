@@ -1,13 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Map as MapIcon, AlertTriangle, Droplets, Info, Wifi, WifiOff } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { usePipeline } from "@/hooks/use-pipeline";
 import { setAnomalyType } from "@/lib/api";
+import dynamic from "next/dynamic";
+
+const FarmMap = dynamic(() => import('./MapComponent'), { ssr: false });
 
 type ZoneId = "north" | "orchard" | "south" | "west";
 
@@ -17,10 +20,7 @@ interface Zone {
     type: string;
     moisture: number;
     status: "optimal" | "dry" | "over-watered";
-    x: number;
-    y: number;
-    width: number;
-    height: number;
+    bounds: [[number, number], [number, number]];
 }
 
 export default function FarmMapPage() {
@@ -33,10 +33,10 @@ export default function FarmMapPage() {
     const isIrrigating = current?.sensor_data?.is_irrigating ?? 0;
 
     const [zones, setZones] = useState<Zone[]>([
-        { id: "north", name: "North Field", type: "Corn", moisture: 45, status: "optimal", x: 10, y: 10, width: 35, height: 35 },
-        { id: "orchard", name: "East Orchard", type: "Citrus", moisture: 38, status: "optimal", x: 55, y: 10, width: 35, height: 45 },
-        { id: "south", name: "South Greenhouse", type: "Tomatoes", moisture: 50, status: "optimal", x: 10, y: 55, width: 45, height: 35 },
-        { id: "west", name: "West Pasture", type: "Alfalfa", moisture: 42, status: "optimal", x: 65, y: 65, width: 25, height: 25 },
+        { id: "north", name: "North Field", type: "Corn", moisture: 45, status: "optimal", bounds: [[30.1560, -9.4270], [30.1580, -9.4240]] },
+        { id: "orchard", name: "East Orchard", type: "Citrus", moisture: 38, status: "optimal", bounds: [[30.1540, -9.4240], [30.1560, -9.4210]] },
+        { id: "south", name: "South Greenhouse", type: "Tomatoes", moisture: 50, status: "optimal", bounds: [[30.1520, -9.4270], [30.1540, -9.4240]] },
+        { id: "west", name: "West Pasture", type: "Alfalfa", moisture: 42, status: "optimal", bounds: [[30.1540, -9.4300], [30.1560, -9.4270]] },
     ]);
 
     const [activeAnomaly, setActiveAnomaly] = useState<ZoneId | null>(null);
@@ -69,7 +69,8 @@ export default function FarmMapPage() {
         }
     }, [isPipeAnomaly, anomalyType]);
 
-    const triggerAnomaly = async (zoneId: ZoneId) => {
+    const triggerAnomaly = async (zoneIdStr: string) => {
+        const zoneId = zoneIdStr as ZoneId;
         const anomalyMap: Record<ZoneId, number> = { north: 1, orchard: 3, south: 2, west: 4 };
         try {
             if (activeAnomaly === zoneId) {
@@ -84,143 +85,117 @@ export default function FarmMapPage() {
         }
     };
 
-    const getZoneColor = (status: Zone["status"]) => {
-        switch (status) {
-            case "dry": return "bg-orange-200/80 border-orange-400";
-            case "optimal": return "bg-green-200/80 border-green-400";
-            case "over-watered": return "bg-blue-300/80 border-blue-500";
-        }
-    };
 
-    const getTextColor = (status: Zone["status"]) => {
-        switch (status) {
-            case "dry": return "text-orange-900";
-            case "optimal": return "text-green-900";
-            case "over-watered": return "text-blue-900";
-        }
-    };
 
     return (
-        <div className="min-h-screen bg-green-50/50 p-4 md:p-8 font-sans text-green-950">
-            <div className="max-w-7xl mx-auto space-y-6">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div>
-                        <h1 className="text-3xl font-bold text-green-800 flex items-center gap-2">
-                            <MapIcon className="w-8 h-8 text-green-600" />
+        <div className="min-h-screen bg-green-50/30 p-4 md:p-8 font-sans text-green-950 pt-20">
+            <div className="max-w-5xl mx-auto space-y-8">
+
+                {/* Header */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                    <div className="flex flex-col items-start gap-2">
+                        <h1 className="text-4xl md:text-5xl font-extrabold text-green-900 flex items-center gap-3">
+                            <MapIcon className="w-10 h-10 text-emerald-600" />
                             {t('title')}
                         </h1>
-                        <p className="text-green-700/80 mt-1">{t('subtitle')} — Live IoT data</p>
-                    </div>
-                    <div className="flex gap-2 items-center">
-                        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold border ${connected
-                            ? "bg-green-50 text-green-700 border-green-200"
-                            : "bg-red-50 text-red-700 border-red-200"
-                            }`}>
-                            {connected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-                            {connected ? "Live" : "Offline"}
-                        </div>
-                        <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300 px-3 py-1">{t('dry')}</Badge>
-                        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 px-3 py-1">{t('optimal')}</Badge>
-                        <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 px-3 py-1">{t('overWatered')}</Badge>
+                        <p className="text-xl text-green-700/90 font-medium">Check which fields need water right now.</p>
                     </div>
                 </div>
 
+                {/* Important Alert */}
+                {isPipeAnomaly && (
+                    <div className="bg-red-100 border-2 border-red-500 rounded-2xl p-6 flex flex-col sm:flex-row items-center sm:items-start gap-4 shadow-sm">
+                        <AlertTriangle className="w-12 h-12 text-red-600 shrink-0" />
+                        <div>
+                            <h3 className="text-3xl font-bold text-red-800 uppercase tracking-wide">Problem in the Field!</h3>
+                            <p className="text-xl text-red-900 mt-2 font-medium">
+                                We detected an issue: <strong className="font-bold underline">{anomalyType}</strong> in the {activeAnomaly} zone.
+                            </p>
+                            <p className="text-lg text-red-800 mt-1">Please check the map highlighted below.</p>
+                        </div>
+                    </div>
+                )}
+
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                    <Card className="lg:col-span-3 border-green-200 shadow-sm overflow-hidden bg-white">
-                        <CardHeader className="bg-green-50/50 border-b border-green-100 pb-3">
-                            <CardTitle className="text-green-800 text-lg flex justify-between items-center">
+                    {/* The Map itself */}
+                    <Card className="lg:col-span-3 rounded-3xl border-2 border-green-100 shadow-sm overflow-hidden bg-white">
+                        <CardHeader className="bg-green-50/50 border-b border-green-100 pb-4">
+                            <CardTitle className="text-green-800 text-2xl font-bold flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                                 <span>{t('liveZoneMap')}</span>
-                                {isPipeAnomaly && (
-                                    <span className="flex items-center gap-2 text-red-600 text-sm animate-pulse bg-red-50 px-3 py-1 rounded-full">
-                                        <AlertTriangle className="w-4 h-4" /> {anomalyType} detected!
-                                    </span>
-                                )}
+                                <div className="flex gap-2 items-center text-base font-normal">
+                                    <Badge className="bg-orange-100 text-orange-800 border-orange-300 px-3 py-1 text-sm hover:bg-orange-200">Too Dry</Badge>
+                                    <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 px-3 py-1 text-sm hover:bg-emerald-200">Perfect</Badge>
+                                    <Badge className="bg-blue-100 text-blue-800 border-blue-300 px-3 py-1 text-sm hover:bg-blue-200">Too Wet</Badge>
+                                </div>
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="p-0">
-                            <div className="relative w-full aspect-video bg-[#e8eedd] overflow-hidden">
-                                <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(#c5d1b3 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
-
-                                <div className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full z-20 flex items-center justify-center border-4 shadow-lg ${isIrrigating ? "bg-green-700 border-green-400" : "bg-gray-800 border-gray-300"}`}>
-                                    <Droplets className={`w-6 h-6 ${isIrrigating ? "text-green-200" : "text-blue-400"}`} />
-                                </div>
-
-                                <svg className="absolute inset-0 w-full h-full z-10 pointer-events-none">
-                                    <line x1="50%" y1="50%" x2="27.5%" y2="27.5%" className={`${activeAnomaly === "north" ? "stroke-red-500 animate-pulse" : "stroke-blue-400/60"}`} strokeWidth="4" strokeDasharray={activeAnomaly === "north" ? "none" : "5,5"} />
-                                    <line x1="50%" y1="50%" x2="72.5%" y2="32.5%" className={`${activeAnomaly === "orchard" ? "stroke-red-500 animate-pulse" : "stroke-blue-400/60"}`} strokeWidth="4" strokeDasharray={activeAnomaly === "orchard" ? "none" : "5,5"} />
-                                    <line x1="50%" y1="50%" x2="32.5%" y2="72.5%" className={`${activeAnomaly === "south" ? "stroke-red-500 animate-pulse" : "stroke-blue-400/60"}`} strokeWidth="4" strokeDasharray={activeAnomaly === "south" ? "none" : "5,5"} />
-                                    <line x1="50%" y1="50%" x2="77.5%" y2="77.5%" className={`${activeAnomaly === "west" ? "stroke-red-500 animate-pulse" : "stroke-blue-400/60"}`} strokeWidth="4" strokeDasharray={activeAnomaly === "west" ? "none" : "5,5"} />
-                                </svg>
-
-                                {zones.map(zone => (
-                                    <div key={zone.id} className={`absolute border-2 rounded-xl flex flex-col items-center justify-center p-2 shadow-sm transition-all duration-500 z-10 ${getZoneColor(zone.status)} hover:scale-[1.02] cursor-pointer hover:z-30`}
-                                        style={{ left: `${zone.x}%`, top: `${zone.y}%`, width: `${zone.width}%`, height: `${zone.height}%` }}>
-                                        <div className="bg-white/80 backdrop-blur-sm px-3 py-2 rounded-lg text-center shadow-sm w-full max-w-[90%]">
-                                            <p className={`font-bold text-sm ${getTextColor(zone.status)}`}>{zone.name}</p>
-                                            <p className="text-xs text-gray-600 mb-1">{zone.type}</p>
-                                            <div className="flex items-center justify-center gap-1 font-mono text-sm">
-                                                <Droplets className={`w-3 h-3 ${getTextColor(zone.status)}`} />
-                                                <span className={getTextColor(zone.status)}>{zone.moisture.toFixed(1)}%</span>
-                                            </div>
-                                        </div>
-                                        {activeAnomaly === zone.id && (
-                                            <div className="absolute inset-0 bg-red-500/10 rounded-xl animate-pulse flex items-center justify-center pointer-events-none"></div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
+                        <CardContent className="p-0 h-[400px] md:h-[500px]">
+                            <FarmMap
+                                zones={zones}
+                                activeAnomaly={activeAnomaly}
+                                onZoneClick={triggerAnomaly}
+                                isIrrigating={isIrrigating}
+                            />
                         </CardContent>
                     </Card>
 
                     <div className="flex flex-col gap-4">
-                        <Card className="border-green-200 shadow-sm">
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-green-800 text-md flex items-center gap-2">
-                                    <AlertTriangle className="w-5 h-5 text-red-500" />
-                                    {t('zoneDetails')}
+                        <Card className="rounded-3xl border-2 border-emerald-100 shadow-sm hover:shadow-md transition-all">
+                            <CardHeader className="pb-3 border-b border-emerald-100">
+                                <CardTitle className="text-emerald-800 text-xl font-bold flex items-center gap-2">
+                                    <Droplets className="w-6 h-6 text-emerald-500" />
+                                    Watering Status
                                 </CardTitle>
-                                <CardDescription>{t('clickZone')}</CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-3">
-                                {zones.map(zone => (
-                                    <Button key={`btn-${zone.id}`} variant={activeAnomaly === zone.id ? "destructive" : "outline"} className="w-full justify-start border-green-200" onClick={() => triggerAnomaly(zone.id)}>
-                                        {activeAnomaly === zone.id ? "Fix: " : "Trigger: "}{zone.name}
-                                    </Button>
-                                ))}
-                                <Button variant="outline" className="w-full justify-start border-green-200 text-green-700"
-                                    onClick={() => { setAnomalyType(0); setActiveAnomaly(null); }}>
-                                    🔄 Reset to Normal
-                                </Button>
-                            </CardContent>
-                        </Card>
-
-                        {current && (
-                            <Card className="border-green-200 shadow-sm">
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-green-800 text-sm">Live Sensor</CardTitle>
-                                </CardHeader>
-                                <CardContent className="text-xs space-y-1 text-green-700">
-                                    <div className="flex justify-between"><span>Flow:</span><span className="font-mono font-bold">{current.sensor_data.flow_lpm.toFixed(1)} L/min</span></div>
-                                    <div className="flex justify-between"><span>Pressure:</span><span className="font-mono font-bold">{current.sensor_data.pressure_bar.toFixed(2)} Bar</span></div>
-                                    <div className="flex justify-between"><span>Moisture:</span><span className="font-mono font-bold">{current.sensor_data.soil_moisture_pct.toFixed(1)}%</span></div>
-                                    <div className="flex justify-between"><span>AI:</span><span className="font-mono font-bold">{current.prediction.anomaly_type}</span></div>
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        <Card className="border-blue-200 bg-blue-50/50 shadow-sm">
-                            <CardContent className="p-4 flex gap-3 items-start">
-                                <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                            <CardContent className="space-y-4 pt-4">
                                 <div>
-                                    <h4 className="font-semibold text-sm text-blue-900">Real-Time Integration</h4>
-                                    <p className="text-xs text-blue-800/80 mt-1 leading-relaxed">
-                                        Zones reflect real soil moisture from the backend IoT pipeline. Triggering an anomaly sends commands to the backend simulator.
-                                    </p>
+                                    <p className="text-emerald-600 font-medium mb-1 text-sm uppercase tracking-wide">Flow Rate</p>
+                                    <p className="text-3xl font-extrabold text-emerald-950">{current?.sensor_data.flow_lpm.toFixed(0) || "0"} <span className="text-lg font-bold text-emerald-700">L/m</span></p>
+                                </div>
+                                <div className="border-t border-emerald-100 pt-3">
+                                    <p className="text-emerald-600 font-medium mb-1 text-sm uppercase tracking-wide">Avg Moisture</p>
+                                    <p className="text-3xl font-extrabold text-emerald-950">{current?.sensor_data.soil_moisture_pct.toFixed(0) || "0"}<span className="text-lg font-bold text-emerald-700">%</span></p>
                                 </div>
                             </CardContent>
                         </Card>
                     </div>
                 </div>
+
+                {/* System Diagnostics / Testing Tools */}
+                <details className="group border border-emerald-200 bg-white shadow-sm rounded-2xl overflow-hidden [&_summary::-webkit-details-marker]:hidden">
+                    <summary className="flex items-center justify-between p-6 cursor-pointer bg-emerald-50/50 hover:bg-emerald-100 transition-colors">
+                        <div className="flex items-center gap-3">
+                            <Info className="w-6 h-6 text-emerald-700" />
+                            <h3 className="text-xl font-bold text-emerald-900">Map Simulation Tools <span className="text-sm font-normal text-emerald-600 ml-2">(Testing only)</span></h3>
+                        </div>
+                        <span className="transition group-open:rotate-180">
+                            <svg fill="none" height="24" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
+                        </span>
+                    </summary>
+                    <div className="p-6 border-t border-emerald-100 space-y-6">
+                        <div className="flex flex-col gap-3">
+                            <p className="text-emerald-800 font-medium">Click buttons to trigger an alert on the map:</p>
+                            <div className="flex flex-wrap gap-2">
+                                {zones.map(zone => (
+                                    <Button key={`btn-${zone.id}`} size="lg" variant={activeAnomaly === zone.id ? "destructive" : "outline"} className={activeAnomaly !== zone.id ? "border-emerald-200 hover:bg-emerald-50" : ""} onClick={() => triggerAnomaly(zone.id)}>
+                                        {activeAnomaly === zone.id ? "Fix: " : "Break: "}{zone.name}
+                                    </Button>
+                                ))}
+                                <Button size="lg" variant="default" className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    onClick={() => { setAnomalyType(0); setActiveAnomaly(null); }}>
+                                    🔄 Reset All
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-4 border-t border-emerald-100">
+                            <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border ${connected ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"}`}>
+                                {connected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
+                                {connected ? "Connection Live" : "Connection Offline"}
+                            </div>
+                        </div>
+                    </div>
+                </details>
             </div>
         </div>
     );

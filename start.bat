@@ -21,9 +21,8 @@ start "AgriFlow Frontend" cmd /k "cd /d %~dp0frontend && npm run dev"
 echo.
 echo =========================================
 echo   Both servers are launching!
-echo   Backend  : http://localhost:8000
-echo   API Docs : http://localhost:8000/docs
-echo   Frontend : http://localhost:3000
+echo   Frontend : https://agadir-water-consumption-vejs.vercel.app
+echo   API Docs : https://agadir-water-consumption-vejs.vercel.app/docs
 echo =========================================
 echo.
 echo This window can be closed.

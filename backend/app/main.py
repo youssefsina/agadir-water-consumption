@@ -55,14 +55,14 @@ async def lifespan(app: FastAPI):
     panel._start_time = _start_time
 
     print("\n" + "=" * 55)
-    print("  ✅  Ready!  Open http://localhost:8000/docs")
-    print("  🎛️  Control Panel: http://localhost:8000/panel")
+    print("  ✅  Ready!  Open https://agadir-water-consumption-vejs.vercel.app/docs")
+    print("  🎛️  Control Panel: https://agadir-water-consumption-vejs.vercel.app/panel")
     if supabase_client:
         print("  ⚡  Supabase Client connected successfully.")
     else:
         print("  ⚠️  Supabase Client failed to connect.")
     print("  🔄  Pipeline running — IoT data every 30s")
-    print("  📡  Connect: ws://localhost:8000/pipeline/ws")
+    print("  📡  Connect: wss://agadir-water-consumption-vejs.vercel.app/pipeline/ws")
     print("=" * 55 + "\n")
 
     yield
@@ -118,8 +118,8 @@ async def root():
         "version": "1.0.0",
         "docs": "/docs",
         "websocket_endpoints": [
-            "ws://localhost:8000/ws/sensors",
-            "ws://localhost:8000/ws/alerts",
+            "wss://agadir-water-consumption-vejs.vercel.app/ws/sensors",
+            "wss://agadir-water-consumption-vejs.vercel.app/ws/alerts",
         ],
         "webhook_endpoints": [
             "POST /webhook/ingest — IoT sensor data",

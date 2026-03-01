@@ -58,7 +58,7 @@ export default async function LocaleLayout({
                     <SidebarProvider>
                         <AppSidebar locale={locale} />
                         <main className="flex-1 w-full overflow-x-hidden relative">
-                            <SidebarTrigger className={`m-4 fixed z-50 bg-white shadow-sm border ${triggerPosition}`} />
+                            <SidebarTrigger className={`m-4 absolute z-50 bg-white/80 backdrop-blur shadow-sm border ${triggerPosition}`} />
                             <div className={`fixed top-4 ${languageSwitcherPosition} z-50`}>
                                 <LanguageSwitcher />
                             </div>
