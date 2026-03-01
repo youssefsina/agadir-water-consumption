@@ -31,7 +31,7 @@ from app.services.pipeline_service import pipeline_manager, pipeline_store
 from app.supabase_client import supabase_client
 
 # Import routers
-from app.routers import webhook, realtime, data, ai, pipeline, panel
+from app.routers import webhook, realtime, data, ai, pipeline, panel, settings
 
 # ── Startup / Shutdown ────────────────────────────────
 _start_time = time.time()
@@ -105,6 +105,7 @@ app.include_router(data.router)
 app.include_router(ai.router)
 app.include_router(pipeline.router)
 app.include_router(panel.router)
+app.include_router(settings.router)
 
 
 # ── Root & Health ─────────────────────────────────────

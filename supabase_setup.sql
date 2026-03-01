@@ -44,3 +44,14 @@ CREATE TABLE IF NOT EXISTS public.webhook_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_webhook_events_received ON public.webhook_events(received_at DESC);
+
+-- WhatsApp notification contacts
+CREATE TABLE IF NOT EXISTS public.whatsapp_contacts (
+    id BIGSERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_whatsapp_contacts_phone ON public.whatsapp_contacts(phone);

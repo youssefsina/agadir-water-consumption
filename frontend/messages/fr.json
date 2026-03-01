@@ -150,5 +150,29 @@
         "status": "Statut",
         "lastSeen": "Dernière vue",
         "action": "Action"
+    },
+    "settings": {
+        "title": "Paramètres",
+        "subtitle": "Gérer les notifications et les préférences du système",
+        "whatsappTitle": "Notifications WhatsApp",
+        "whatsappDesc": "Contacts qui reçoivent les alertes d'anomalie via WhatsApp",
+        "addContact": "Ajouter un contact",
+        "nameLabel": "Nom",
+        "namePlaceholder": "ex. Ahmed",
+        "phoneLabel": "Numéro WhatsApp",
+        "phonePlaceholder": "+212612345678",
+        "addButton": "Ajouter le contact",
+        "contactList": "Contacts de notification",
+        "loading": "Chargement des contacts...",
+        "noContacts": "Aucun contact. Ajoutez-en un pour recevoir les alertes.",
+        "activate": "Activer",
+        "deactivate": "Désactiver",
+        "delete": "Supprimer",
+        "contactAdded": "Contact ajouté avec succès !",
+        "contactDeleted": "Contact supprimé.",
+        "fillBothFields": "Veuillez remplir le nom et le numéro de téléphone.",
+        "phoneExists": "Ce numéro de téléphone est déjà enregistré.",
+        "infoTitle": "Comment ça marche",
+        "infoDesc": "Lorsque le modèle IA détecte une anomalie (fuite, rupture de tuyau, sur-irrigation, etc.), un message WhatsApp est automatiquement envoyé à tous les contacts actifs listés ici."
     }
 }

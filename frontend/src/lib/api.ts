@@ -121,6 +121,14 @@ export interface WhatsAppLogEntry {
     result: Record<string, unknown>;
 }
 
+export interface WhatsAppContact {
+    id: number;
+    name: string;
+    phone: string;
+    active: boolean;
+    created_at: string;
+}
+
 export interface WebhookEvent {
     event_id: string;
     device_id?: string;
@@ -240,6 +248,33 @@ export async function getWebhookEvents(params?: {
 
 export async function getStreamStatus(): Promise<{ active_connections: number; status: string }> {
     return apiFetch("/stream/status");
+}
+
+// ── WhatsApp Contact Settings ────────────────────────────
+
+export async function getWhatsAppContacts(): Promise<{ contacts: WhatsAppContact[] }> {
+    return apiFetch("/settings/whatsapp/contacts");
+}
+
+export async function addWhatsAppContact(name: string, phone: string): Promise<{ status: string; contact: WhatsAppContact }> {
+    return apiFetch("/settings/whatsapp/contacts", {
+        method: "POST",
+        body: JSON.stringify({ name, phone }),
+    });
+}
+
+export async function updateWhatsAppContact(
+    id: number,
+    data: { name?: string; phone?: string; active?: boolean },
+): Promise<{ status: string; contact: WhatsAppContact }> {
+    return apiFetch(`/settings/whatsapp/contacts/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+    });
+}
+
+export async function deleteWhatsAppContact(id: number): Promise<{ status: string; id: number }> {
+    return apiFetch(`/settings/whatsapp/contacts/${id}`, { method: "DELETE" });
 }
 
 // ── WebSocket Helper ─────────────────────────────────────

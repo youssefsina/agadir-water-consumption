@@ -58,6 +58,8 @@ class IoTSimulator:
         self._anomaly_cooldown = 0  # ticks until next anomaly allowed
         self._current_anomaly = 0   # current forced anomaly type
         self._anomaly_remaining = 0  # ticks remaining in current anomaly
+        self._ticks_since_last_anomaly = 0  # tracks ticks since last anomaly ended
+        self.MAX_NORMAL_TICKS = 4   # force anomaly every 4 ticks (2 min at 30s interval)
         
         # Rolling buffers for computed features
         self._flow_buffer: list[float] = []
@@ -165,7 +167,7 @@ class IoTSimulator:
             self._anomaly_remaining -= 1
             if self._anomaly_remaining == 0:
                 self._current_anomaly = 0
-                self._anomaly_cooldown = random.randint(10, 30)  # cooldown before next anomaly
+                self._anomaly_cooldown = random.randint(1, 2)  # short cooldown before next anomaly
 
         reading = {
             "timestamp": now.isoformat(),
@@ -191,16 +193,20 @@ class IoTSimulator:
         return reading
 
     def _maybe_inject_anomaly(self, now: datetime):
-        """Randomly inject anomalies at realistic intervals."""
+        """Inject anomalies — guaranteed at least once every 4 ticks (2 minutes)."""
         if self._current_anomaly != 0:
             return  # already in an anomaly
-        
+
+        self._ticks_since_last_anomaly += 1
+
         if self._anomaly_cooldown > 0:
             self._anomaly_cooldown -= 1
-            return
+            # Override cooldown if we've waited too long
+            if self._ticks_since_last_anomaly < self.MAX_NORMAL_TICKS:
+                return
 
-        # Probability of starting an anomaly per tick (~3% per 30s = ~6% per minute)
-        if random.random() > 0.03:
+        # Force anomaly if MAX_NORMAL_TICKS reached, otherwise ~15% chance per tick
+        if self._ticks_since_last_anomaly < self.MAX_NORMAL_TICKS and random.random() > 0.15:
             return
 
         hour = now.hour
@@ -229,8 +235,9 @@ class IoTSimulator:
 
         if anomaly_type > 0:
             self._current_anomaly = anomaly_type
-            # Duration: 3-10 ticks (1.5 to 5 minutes)
-            self._anomaly_remaining = random.randint(3, 10)
+            # Duration: 2-5 ticks (1 to 2.5 minutes)
+            self._anomaly_remaining = random.randint(2, 5)
+            self._ticks_since_last_anomaly = 0
             print(f"  ⚡ IoT Simulator: Injecting anomaly #{anomaly_type} "
                   f"({ANOMALY_LABELS[anomaly_type]}) for {self._anomaly_remaining} ticks")
 

@@ -24,7 +24,7 @@ export function AppSidebar({ locale: initialLocale }: { locale?: string }) {
         { titleKey: "schedule", url: `/${locale}/schedule`, icon: CalendarRange },
         { titleKey: "analytics", url: `/${locale}/analytics`, icon: BrainCircuit },
         { titleKey: "devices", url: `/${locale}/devices`, icon: Router },
-        { titleKey: "settings", url: "#", icon: Settings },
+        { titleKey: "settings", url: `/${locale}/settings`, icon: Settings },
     ] as const;
 
     const sidebarSide = locale === "ar" ? "right" : "left";

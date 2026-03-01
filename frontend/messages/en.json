@@ -149,5 +149,29 @@
         "status": "Status",
         "lastSeen": "Last Seen",
         "action": "Action"
+    },
+    "settings": {
+        "title": "Settings",
+        "subtitle": "Manage notifications and system preferences",
+        "whatsappTitle": "WhatsApp Notifications",
+        "whatsappDesc": "Contacts who receive anomaly alerts via WhatsApp",
+        "addContact": "Add New Contact",
+        "nameLabel": "Name",
+        "namePlaceholder": "e.g. Ahmed",
+        "phoneLabel": "WhatsApp Number",
+        "phonePlaceholder": "+212612345678",
+        "addButton": "Add Contact",
+        "contactList": "Notification Contacts",
+        "loading": "Loading contacts...",
+        "noContacts": "No contacts yet. Add one to receive anomaly alerts.",
+        "activate": "Activate",
+        "deactivate": "Deactivate",
+        "delete": "Delete",
+        "contactAdded": "Contact added successfully!",
+        "contactDeleted": "Contact removed.",
+        "fillBothFields": "Please fill in both name and phone number.",
+        "phoneExists": "This phone number is already registered.",
+        "infoTitle": "How it works",
+        "infoDesc": "When the AI model detects an anomaly (leak, pipe burst, over-irrigation, etc.), a WhatsApp message is automatically sent to all active contacts listed here."
     }
 }

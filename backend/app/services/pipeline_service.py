@@ -22,6 +22,20 @@ from app.services.whatsapp_service import send_message as whatsapp_send_message
 from app.supabase_client import supabase_client
 
 
+def _get_whatsapp_recipients() -> list[str]:
+    """Fetch active WhatsApp contacts from Supabase, fall back to env defaults."""
+    from app.config import WHATSAPP_DEFAULT_RECIPIENTS
+    try:
+        if supabase_client:
+            result = supabase_client.table("whatsapp_contacts").select("phone").eq("active", True).execute()
+            phones = [r["phone"] for r in (result.data or []) if r.get("phone")]
+            if phones:
+                return phones
+    except Exception as e:
+        print(f"  ⚠ Failed to fetch WhatsApp contacts from Supabase: {e}")
+    return WHATSAPP_DEFAULT_RECIPIENTS or []
+
+
 class PipelineStore:
     """In-memory store for IoT readings + predictions."""
 
@@ -174,6 +188,7 @@ class PipelineManager:
                     "hour_of_day": reading["hour_of_day"],
                     "flow_rolling_mean": reading["flow_rolling_mean"],
                     "flow_rolling_std": reading["flow_rolling_std"],
+                    "pressure_rolling_mean": reading["pressure_rolling_mean"],
                     "pressure_drop": reading["pressure_drop"],
                     "flow_deviation": reading["flow_deviation"],
                     "soil_delta": reading["soil_delta"],
@@ -248,6 +263,7 @@ class PipelineManager:
         # ── 4. WhatsApp alert on anomaly ────────────────
         if prediction.get("is_anomaly", False):
             if self._whatsapp_cooldown <= 0:
+                recipients = _get_whatsapp_recipients()
                 wa_message = (
                     f"🚨 *ANOMALY DETECTED*\n\n"
                     f"🕐 Time: {reading['timestamp']}\n"
@@ -259,7 +275,10 @@ class PipelineManager:
                     f"🌡 Temp: {reading['temperature_c']:.1f}°C\n\n"
                     f"Please check the dashboard immediately."
                 )
-                wa_result = whatsapp_send_message(wa_message)
+                if recipients:
+                    wa_result = whatsapp_send_message(wa_message, recipients=recipients)
+                else:
+                    wa_result = {"success": False, "error": "No WhatsApp recipients configured"}
                 pipeline_store.whatsapp_log.append({
                     "timestamp": reading["timestamp"],
                     "anomaly_type": prediction["anomaly_type"],

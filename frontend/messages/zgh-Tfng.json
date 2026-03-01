@@ -149,5 +149,29 @@
         "status": "ⴰⴷⴷⴰⴷ",
         "lastSeen": "ⴰⵣⵔⵉ ⴰⵎⴳⴳⴰⵔⵓ",
         "action": "ⵜⵉⴳⴰⵡⵜ"
+    },
+    "settings": {
+        "title": "ⵜⵉⵙⵖⴰⵍⵉⵏ",
+        "subtitle": "ⴰⵙⵙⵡⵓⴷⴷⵓ ⵏ ⵉⵙⵖⴰⵍⵏ ⴷ ⵉⵙⵜⴰⵢⵏ ⵏ ⵓⵏⴰⴳⵔⴰⵡ",
+        "whatsappTitle": "ⵉⵙⵖⴰⵍⵏ ⵏ WhatsApp",
+        "whatsappDesc": "ⵉⵎⴷⵔⴰⵡⵏ ⵉⵜⵜⵓⴳⴰⵏ ⵉⵙⵖⴰⵍⵏ ⵏ ⵓⴽⴰⵔⵉ ⵙ WhatsApp",
+        "addContact": "ⵔⵏⵓ ⴰⵎⴷⵔⴰⵡ ⴰⵎⴰⵢⵏⵓ",
+        "nameLabel": "ⵉⵙⵎ",
+        "namePlaceholder": "ⵎⴷ: ⴰⵃⵎⴰⴷ",
+        "phoneLabel": "ⵓⵟⵟⵓⵏ ⵏ WhatsApp",
+        "phonePlaceholder": "+212612345678",
+        "addButton": "ⵔⵏⵓ ⴰⵎⴷⵔⴰⵡ",
+        "contactList": "ⵉⵎⴷⵔⴰⵡⵏ ⵏ ⵉⵙⵖⴰⵍⵏ",
+        "loading": "ⴰⵙⴰⴳⵎ ⵏ ⵉⵎⴷⵔⴰⵡⵏ...",
+        "noContacts": "ⵓⵔ ⴷ ⵍⵍⵉⵏ ⵉⵎⴷⵔⴰⵡⵏ. ⵔⵏⵓ ⵢⴰⵏ ⴰⴷ ⵜⵜⴰⵡⵉⴷ ⵉⵙⵖⴰⵍⵏ.",
+        "activate": "ⵙⵙⵔⵎ",
+        "deactivate": "ⵙⵙⴱⴷⴷ",
+        "delete": "ⴽⴽⵙ",
+        "contactAdded": "ⵢⵜⵜⵡⴰⵔⵏⴰ ⵓⵎⴷⵔⴰⵡ ⵙ ⵓⵎⵢⵓⵙ!",
+        "contactDeleted": "ⵢⵜⵜⵡⴰⴽⴽⵙ ⵓⵎⴷⵔⴰⵡ.",
+        "fillBothFields": "ⵙⴽⵛⵎ ⵉⵙⵎ ⴷ ⵓⵟⵟⵓⵏ.",
+        "phoneExists": "ⵓⵟⵟⵓⵏ ⴰⴷ ⵢⵍⵍⴰ ⴷⵖ.",
+        "infoTitle": "ⵎⴰⵎⴽ ⵉⵜⵜⵙⵡⵓⵔⵉ",
+        "infoDesc": "ⴰⵙⵎⵉ ⴰⵎⵓⴷⴰⵍ ⵏ AI ⵉⵜⵜⴰⴼ ⴰⴽⴰⵔⵉ, ⵜⵓⵣⵏ ⵜⴰⴱⵔⴰⵜ ⵏ WhatsApp ⵙ ⵓⵖⴰⵔⴰⵙ ⵉ ⵉⵎⴷⵔⴰⵡⵏ ⵉⵔⵎⴰⵏ ⴷⴰ."
     }
 }
