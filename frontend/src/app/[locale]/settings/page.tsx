@@ -152,16 +152,16 @@ export default function SettingsPage() {
                                 <Settings className="w-6 h-6 text-green-600" />
                             </div>
                             <div>
-                                <CardTitle className="text-lg">System Preferences</CardTitle>
-                                <CardDescription>Configure global app behavior</CardDescription>
+                                <CardTitle className="text-lg">{t("systemPreferences")}</CardTitle>
+                                <CardDescription>{t("systemPrefDesc")}</CardDescription>
                             </div>
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="flex items-center justify-between p-4 rounded-2xl bg-green-50/50 border border-green-100">
                             <div className="space-y-0.5">
-                                <h4 className="font-bold text-green-900">Developer Debug Mode</h4>
-                                <p className="text-sm text-green-700/80 font-medium">Show advanced simulator and testing tools on Dashboard and Map.</p>
+                                <h4 className="font-bold text-green-900">{t("devDebugMode")}</h4>
+                                <p className="text-sm text-green-700/80 font-medium">{t("devDebugModeDesc")}</p>
                             </div>
                             <Switch checked={devMode} onCheckedChange={toggleDevMode} />
                         </div>
@@ -258,8 +258,8 @@ export default function SettingsPage() {
                                         <div
                                             key={contact.id}
                                             className={`flex items-center justify-between p-3 rounded-xl border transition-all ${contact.active
-                                                    ? "bg-white border-green-200 hover:border-green-400"
-                                                    : "bg-gray-50 border-gray-200 opacity-60"
+                                                ? "bg-white border-green-200 hover:border-green-400"
+                                                : "bg-gray-50 border-gray-200 opacity-60"
                                                 }`}
                                         >
                                             <div className="flex items-center gap-3">

@@ -266,6 +266,17 @@ class PipelineManager:
             if self._whatsapp_cooldown <= 0:
                 recipients = _get_whatsapp_recipients()
                 zone = random.choice(["A", "B", "C", "D"])
+                anom_type = prediction.get("anomaly_type", "")
+                advice = "رد البال: كاين شي مشكل فالسقي، ضرب دويرة وتأكد من الماطريال."
+                if "Leak" in anom_type or "Burst" in anom_type:
+                    advice = "رد البال: يقدر يكون شي تيو مطرطق ولا كيسيل. سير قلب الجعاب دالما فالبلاصة بالزربة!"
+                elif "Over" in anom_type:
+                    advice = "رد البال: الأرض فازكة بزاف. تأكد واش الماكينة حبسات ولا باقا خدامة باش مايخسرش الغرس!"
+                elif "Under" in anom_type:
+                    advice = "رد البال: الغرس راه ناشف وماكياخدش الما مزيان. المرجو مراقبة البومبا واش مسدودة ولا خاسرة!"
+                elif "Rain" in anom_type:
+                    advice = "رد البال: الشتا غاتطيح والسقي خدام. طفي الما باش تقتصد وما يضيعش كلشي!"
+                    
                 wa_message = (
                     f"🚨 *إنذار: حالة غير طبيعية اكتشفناها فالسقي*\n"
                     f"📍 المنطقة (Zone): {zone}\n\n"
@@ -276,6 +287,7 @@ class PipelineManager:
                     f"🔧 الضغط: {reading['pressure_bar']:.2f} bar\n"
                     f"🌱 رطوبة التربة: {reading['soil_moisture_pct']:.1f}%\n"
                     f"🌡 الحرارة: {reading['temperature_c']:.1f}°C\n\n"
+                    f"💡 *نصيحة الذكاء الاصطناعي*: {advice}\n"
                     f"عافاك طّل على الداشبورد دابا، النظام يقدر يكون فيه شي مشكل فالمنطقة {zone}."
                 )
                 if recipients:

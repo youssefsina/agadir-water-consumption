@@ -127,7 +127,7 @@ export default function Dashboard() {
                     .map((r) => ({
                         id: String(r.id || Math.random()),
                         time: new Date(r.timestamp).toLocaleTimeString(),
-                        message: `${r.anomaly_type || "Unknown Anomaly"} detected! Confidence: ${(r.anomaly_confidence * 100).toFixed(0)}%`,
+                        message: t("anomalyDetected", { type: r.anomaly_type || t("unknownAnomaly"), confidence: (r.anomaly_confidence * 100).toFixed(0) }),
                         type: "destructive" as const,
                     }));
                 if (histAlerts.length > 0) setAlerts(histAlerts);
@@ -201,12 +201,12 @@ export default function Dashboard() {
 
         // Alert on anomalies
         if (pred.is_anomaly) {
-            const anType = pred.anomaly_type || "Unknown Anomaly";
+            const anType = pred.anomaly_type || t("unknownAnomaly");
             let recipients: string[] | undefined = undefined;
             if (current.whatsapp_result?.results) {
                 recipients = current.whatsapp_result.results.filter((r: any) => r.success).map((r: any) => r.phone);
             }
-            addAlert(`${anType} detected! Confidence: ${(pred.confidence * 100).toFixed(0)}%`, "destructive", recipients);
+            addAlert(t("anomalyDetected", { type: anType, confidence: (pred.confidence * 100).toFixed(0) }), "destructive", recipients);
         }
     }, [current, addAlert]);
 
@@ -243,14 +243,14 @@ export default function Dashboard() {
                         </div>
                         <div>
                             <h2 className="text-3xl md:text-5xl font-extrabold mb-2">
-                                {decision === "ON" ? "Watering is ON" :
-                                    decision === "PAUSE" ? "Watering Paused" :
-                                        "Watering is OFF"}
+                                {decision === "ON" ? t("wateringOn") :
+                                    decision === "PAUSE" ? t("wateringPaused") :
+                                        t("wateringOff")}
                             </h2>
                             <p className="text-lg md:text-xl opacity-90 font-medium">
-                                {decision === "ON" ? "The crops are getting water right now." :
-                                    decision === "PAUSE" ? "Temporary pause (like rain expected)." :
-                                        "No water is flowing currently."}
+                                {decision === "ON" ? t("cropsGettingWater") :
+                                    decision === "PAUSE" ? t("tempPauseRain") :
+                                        t("noWaterFlowing")}
                             </p>
                         </div>
                     </div>
@@ -261,7 +261,7 @@ export default function Dashboard() {
                     <div className="bg-red-100 border-2 border-red-500 rounded-2xl p-6 flex items-start gap-4">
                         <AlertTriangle className="w-10 h-10 text-red-600 shrink-0" />
                         <div>
-                            <h3 className="text-2xl font-bold text-red-800">Attention Needed!</h3>
+                            <h3 className="text-2xl font-bold text-red-800">{t("attentionNeeded")}</h3>
                             <p className="text-lg text-red-900 mt-1">{alerts[0].message}</p>
                         </div>
                     </div>
@@ -279,7 +279,7 @@ export default function Dashboard() {
                             <div>
                                 <div className="text-5xl md:text-7xl font-black text-emerald-950 mb-4">{currentData.moisture.toFixed(0)}<span className="text-2xl md:text-4xl text-emerald-600 font-bold ml-1">%</span></div>
                                 <p className="mt-4 text-emerald-700 font-medium text-lg">
-                                    {currentData.moisture < 30 ? "Soil is too dry! Needs water." : currentData.moisture > 60 ? "Soil is very wet." : "Perfect moisture level."}
+                                    {currentData.moisture < 30 ? t("soilTooDry") : currentData.moisture > 60 ? t("soilVeryWet") : t("perfectMoisture")}
                                 </p>
                             </div>
                             <Sparkline data={chartData} dataKey="moisture" color="#10b981" />
@@ -297,7 +297,7 @@ export default function Dashboard() {
                                 <div className="text-5xl md:text-7xl font-black text-blue-950 mb-4">{currentData.flow.toFixed(0)}<span className="text-lg md:text-2xl text-blue-600 font-bold ml-2 text-wrap">L/min</span></div>
                                 <div className="pt-2">
                                     <p className="text-blue-700 font-medium text-lg flex items-center gap-2">
-                                        {currentData.flow > 100 ? "Water flowing quickly." : currentData.flow > 0 ? "Water flowing normally." : "No flow detected."}
+                                        {currentData.flow > 100 ? t("waterFlowingQuickly") : currentData.flow > 0 ? t("waterFlowingNormally") : t("noFlowDetected")}
                                     </p>
                                 </div>
                             </div>
@@ -315,7 +315,7 @@ export default function Dashboard() {
                             <div>
                                 <div className="text-5xl md:text-7xl font-black text-indigo-950 mb-4">{currentData.pressure.toFixed(1)}<span className="text-2xl md:text-4xl text-indigo-600 font-bold ml-2">Bar</span></div>
                                 <p className="text-indigo-700 font-medium text-lg">
-                                    {currentData.pressure < 1.0 ? "Pressure is low! Check pipes." : "Pressure is good."}
+                                    {currentData.pressure < 1.0 ? t("pressureLow") : t("pressureGood")}
                                 </p>
                             </div>
                             <Sparkline data={chartData} dataKey="pressure" color="#6366f1" />
@@ -332,7 +332,7 @@ export default function Dashboard() {
                             <div>
                                 <div className="text-5xl md:text-7xl font-black text-orange-950 mb-4">{currentData.temperature.toFixed(0)}<span className="text-2xl md:text-4xl text-orange-600 font-bold ml-2">°C</span></div>
                                 <p className="text-orange-700 font-medium text-lg">
-                                    {currentData.temperature > 35 ? "It's very hot today!" : currentData.temperature < 15 ? "It's a bit cold today." : "Nice mild temperature."}
+                                    {currentData.temperature > 35 ? t("tempVeryHot") : currentData.temperature < 15 ? t("tempCold") : t("tempMild")}
                                 </p>
                             </div>
                             <Sparkline data={chartData} dataKey="temperature" color="#f97316" />
@@ -345,7 +345,7 @@ export default function Dashboard() {
                     {/* Main Chart */}
                     <Card className="w-full rounded-3xl border-2 border-green-200 shadow-sm hover:shadow-md transition-shadow">
                         <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                            <CardTitle className="text-xl md:text-2xl font-bold text-green-800">Flow & Pressure History</CardTitle>
+                            <CardTitle className="text-xl md:text-2xl font-bold text-green-800">{t("flowPressureHistory")}</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="h-[500px] w-full mt-4 bg-white rounded-2xl p-4 border border-green-50 shadow-inner">
@@ -369,8 +369,8 @@ export default function Dashboard() {
                                             contentStyle={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                             itemStyle={{ color: '#166534' }}
                                         />
-                                        <Area yAxisId="left" type="monotone" dataKey="flow" stroke="#22c55e" strokeWidth={2} fillOpacity={1} fill="url(#colorFlowMain)" name="Flow (L/min)" isAnimationActive={false} />
-                                        <Area yAxisId="right" type="monotone" dataKey="pressure" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorPressureMain)" name="Pressure (Bar)" isAnimationActive={false} />
+                                        <Area yAxisId="left" type="monotone" dataKey="flow" stroke="#22c55e" strokeWidth={2} fillOpacity={1} fill="url(#colorFlowMain)" name={t("waterFlow")} isAnimationActive={false} />
+                                        <Area yAxisId="right" type="monotone" dataKey="pressure" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorPressureMain)" name={t("pressure")} isAnimationActive={false} />
                                     </AreaChart>
                                 </ResponsiveContainer>
                             </div>
@@ -382,7 +382,7 @@ export default function Dashboard() {
                         <CardHeader className="pb-2">
                             <CardTitle className="text-xl md:text-2xl font-bold text-red-800 flex items-center gap-2">
                                 <AlertTriangle className="w-6 h-6 text-red-600" />
-                                Recent Alerts
+                                {t("recentAlerts")}
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="flex-1 overflow-y-auto max-h-[400px] mt-2 space-y-3">
@@ -391,7 +391,7 @@ export default function Dashboard() {
                                     <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
                                         <Droplets className="w-8 h-8 text-green-500" />
                                     </div>
-                                    All systems normal.<br />No recent alerts.
+                                    {t("allSystemsNormal")}
                                 </div>
                             ) : (
                                 alerts.map(alert => (
@@ -399,14 +399,14 @@ export default function Dashboard() {
                                         <DialogTrigger asChild>
                                             <button className={`w-full text-left p-4 rounded-xl border cursor-pointer hover:shadow-md transition-all ${alert.type === 'destructive' ? 'bg-red-50 border-red-200 hover:bg-red-100' : 'bg-yellow-50 border-yellow-200 hover:bg-yellow-100'}`}>
                                                 <div className="flex justify-between items-center mb-1">
-                                                    <span className={`font-bold ${alert.type === 'destructive' ? 'text-red-800' : 'text-yellow-800'}`}>{alert.type === 'destructive' ? 'Critical Action Needed' : 'Warning'}</span>
+                                                    <span className={`font-bold ${alert.type === 'destructive' ? 'text-red-800' : 'text-yellow-800'}`}>{alert.type === 'destructive' ? t("criticalActionNeeded") : t("warningTitle")}</span>
                                                     <span className="text-xs text-gray-500 font-bold">{alert.time}</span>
                                                 </div>
                                                 <div className="flex flex-col gap-1 items-start mt-1">
                                                     <p className="text-sm text-gray-700 font-medium line-clamp-1">{alert.message}</p>
                                                     {alert.recipients && alert.recipients.length > 0 && (
                                                         <span className="text-[10px] bg-green-100/50 text-green-800 px-2 py-0.5 rounded-full border border-green-200 mt-1 line-clamp-1 text-left font-semibold">
-                                                            📱 WhatsApp sent to {alert.recipients.length} {alert.recipients.length === 1 ? 'number' : 'numbers'}
+                                                            📱 {alert.recipients.length === 1 ? t("whatsappSentToOne") : t("whatsappSentTo", { count: alert.recipients.length })}
                                                         </span>
                                                     )}
                                                 </div>
@@ -416,12 +416,12 @@ export default function Dashboard() {
                                             <DialogHeader>
                                                 <DialogTitle className="flex items-center gap-3 text-2xl pt-2">
                                                     <AlertTriangle className={`w-8 h-8 ${alert.type === 'destructive' ? 'text-red-600' : 'text-yellow-600'}`} />
-                                                    {alert.type === 'destructive' ? 'Critical Alert' : 'System Warning'}
+                                                    {alert.type === 'destructive' ? t("criticalAlert") : t("systemWarning")}
                                                 </DialogTitle>
                                             </DialogHeader>
                                             <div className="py-2">
                                                 <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 mb-4">
-                                                    <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Time of Event</p>
+                                                    <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">{t("timeOfEvent")}</p>
                                                     <p className="text-lg font-extrabold text-gray-900">{alert.time}</p>
                                                 </div>
                                                 <p className="text-lg text-gray-800 font-medium leading-relaxed bg-red-50/50 p-4 border border-red-100 rounded-2xl mb-4">
@@ -431,13 +431,13 @@ export default function Dashboard() {
                                                     <div className="bg-green-50/50 p-4 rounded-2xl border border-green-100">
                                                         <p className="text-xs text-green-700 font-bold uppercase tracking-wider mb-2 flex items-center gap-2">
                                                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-circle"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /></svg>
-                                                            WhatsApp Notification Sent
+                                                            {t("whatsappNotificationSent")}
                                                         </p>
                                                         <ul className="space-y-1">
                                                             {alert.recipients.map((phone, idx) => (
                                                                 <li key={idx} className="text-sm font-medium text-green-900 bg-white px-3 py-1.5 rounded-xl border border-green-100 flex items-center justify-between">
                                                                     <span>{phone}</span>
-                                                                    <span className="text-[10px] text-green-600 bg-green-50 px-2 py-0.5 font-bold uppercase tracking-wider rounded-full">Delivered</span>
+                                                                    <span className="text-[10px] text-green-600 bg-green-50 px-2 py-0.5 font-bold uppercase tracking-wider rounded-full">{t("delivered")}</span>
                                                                 </li>
                                                             ))}
                                                         </ul>
@@ -446,7 +446,7 @@ export default function Dashboard() {
                                                 <div className="mt-8 pt-6 border-t border-gray-100">
                                                     <p className="text-sm text-gray-600 font-medium flex items-start gap-2">
                                                         <Settings className="w-5 h-5 text-gray-400 shrink-0" />
-                                                        Our AI suggests checking the field immediately to prevent further damage or water loss.
+                                                        {t("aiSuggestsCheck")}
                                                     </p>
                                                 </div>
                                             </div>
@@ -463,7 +463,7 @@ export default function Dashboard() {
                         <summary className="flex items-center justify-between p-6 cursor-pointer bg-emerald-50 hover:bg-emerald-100 transition-colors">
                             <div className="flex items-center gap-3">
                                 <Settings className="w-6 h-6 text-green-700" />
-                                <h3 className="text-xl font-bold text-green-900">Advanced Simulator & Network Details <span className="text-sm font-normal text-green-600 ml-2">(For Testing only)</span></h3>
+                                <h3 className="text-xl font-bold text-green-900">{t("advSimulatorTitle")} <span className="text-sm font-normal text-green-600 ml-2">{t("forTestingOnly")}</span></h3>
                             </div>
                             <span className="transition group-open:rotate-180">
                                 <svg fill="none" height="24" shapeRendering="geometricPrecision" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
@@ -499,16 +499,16 @@ export default function Dashboard() {
                             <div className="flex flex-wrap gap-4 items-center pt-4 border-t border-green-100">
                                 <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border ${connected ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200"}`}>
                                     {connected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
-                                    {connected ? "Connection Live" : "Connection Offline"}
+                                    {connected ? t("connectionLive") : t("connectionOffline")}
                                 </div>
 
                                 <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-bold ${dbError ? "bg-red-50 border-red-200 text-red-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`}>
-                                    Database Status: {dbError ? "Error" : "Online"} ({dbStats?.total_rows?.toLocaleString() ?? "0"} records)
+                                    {t("databaseStatus")}: {dbError ? t("errorStatus") : t("onlineStatus")} ({dbStats?.total_rows?.toLocaleString() ?? "0"} {t("records")})
                                 </div>
 
                                 {health && (
                                     <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-green-200 text-sm font-bold text-green-700">
-                                        Backend Engine: {health.status}
+                                        {t("backendEngine")}: {health.status}
                                     </div>
                                 )}
                             </div>

@@ -105,12 +105,21 @@ def send_alert(device_id: str, event_type: str, data: dict) -> dict:
     """
     import random
     zone = random.choice(["A", "B", "C", "D"])
+    advice = "رد البال: كاين شي مشكل فالسقي، ضرب دويرة وتأكد من الماطريال."
+    if "Leak" in event_type or "Burst" in event_type:
+        advice = "رد البال: يقدر يكون شي تيو مطرطق ولا كيسيل. سير قلب الجعاب دالما فالبلاصة بالزربة!"
+    elif "Over" in event_type:
+        advice = "رد البال: الأرض فازكة بزاف. تأكد واش الماكينة حبسات ولا باقا خدامة باش مايخسرش الغرس!"
+    elif "Under" in event_type:
+        advice = "رد البال: الغرس راه ناشف وماكياخدش الما مزيان. المرجو مراقبة البومبا واش مسدودة ولا خاسرة!"
+    
     msg = (
         f"⚠️ *إنذار من السقي الذكي*\n"
         f"📍 المنطقة (Zone): {zone}\n\n"
         f"الجهاز (Device): `{device_id}`\n"
         f"الحدث (Event): {event_type}\n"
         f"المعلومات (Data): {data}\n\n"
+        f"💡 *نصيحة*: {advice}\n"
         f"عافاك طّل على النظام دالسقي دابا للمنطقة {zone}."
     )
     return send_message(msg, recipients=WHATSAPP_DEFAULT_RECIPIENTS or None)
