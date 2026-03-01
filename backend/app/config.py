@@ -3,7 +3,6 @@ Application configuration.
 """
 import os
 from pathlib import Path
-
 from dotenv import load_dotenv
 
 # Load .env from backend/ before reading env vars
@@ -45,9 +44,11 @@ WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "dev-secret-key-change-me")
 # WaSendAPI: secret from dashboard → Webhook settings (for X-Webhook-Signature verification)
 WASENDER_WEBHOOK_SECRET = os.getenv("WASENDER_WEBHOOK_SECRET", "")
 
-# ── WhatsApp (WaSendAPI) ──────────────────────────────
-# WaSendAPI API key: https://www.wasenderapi.com
+# ── WhatsApp (WaSendAPI / Cloud API) ─────────────────
+# WaSendAPI: API key from https://www.wasenderapi.com
+# Cloud API: Access token + Phone Number ID from Meta Developer Console
 WHATSAPP_ACCESS_TOKEN = os.getenv("WHATSAPP_ACCESS_TOKEN", "")
+WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
 # Default recipients for alerts (comma-separated, e.g. "212612345678,212698765432")
 WHATSAPP_DEFAULT_RECIPIENTS = [
     p.strip()
@@ -63,3 +64,7 @@ CORS_ORIGINS = [
     "http://127.0.0.1:5173",
     "*",
 ]
+
+# ── Supabase ───────────────────────────────────────────────
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")

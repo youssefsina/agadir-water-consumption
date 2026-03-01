@@ -4,10 +4,8 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CalendarRange, CloudRain, Sun, Cloud, ThermometerSun, AlertCircle, Sparkles, Loader2 } from "lucide-react";
-import {
-    getPipelineHistory,
-    type PipelineEntry,
-} from "@/lib/api";
+import { useTranslations } from "next-intl";
+import { getPipelineHistory, type PipelineEntry } from "@/lib/api";
 
 interface ScheduleEvent {
     time: string;
@@ -31,10 +29,10 @@ interface DaySchedule {
 }
 
 export default function SchedulePage() {
+    const t = useTranslations('schedule');
     const [pipelineData, setPipelineData] = useState<PipelineEntry[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Fetch real pipeline history
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -52,19 +50,11 @@ export default function SchedulePage() {
         return () => clearInterval(timer);
     }, []);
 
-    // Calculate stats from real pipeline data
     const totalEntries = pipelineData.length;
     const anomalies = pipelineData.filter(e => e.prediction.is_anomaly);
-    const normalEntries = pipelineData.filter(e => !e.prediction.is_anomaly);
-    const rainEvents = pipelineData.filter(e => e.sensor_data.rain_probability > 0.5);
-    const irrigatingEntries = pipelineData.filter(e => e.sensor_data.is_irrigating);
     const skippedByRain = pipelineData.filter(e => e.sensor_data.rain_probability > 0.6 && !e.sensor_data.is_irrigating);
+    const estimatedLitersSaved = skippedByRain.length * 30 * 120;
 
-    // Estimate water saved from skipped irrigation during rain
-    const estimatedLitersSaved = (skippedByRain.length * 30 * 120); // 30 sec interval x 120 L/min flow
-    const anomalyMitigated = anomalies.length;
-
-    // Build schedule from real pipeline data — group by date
     const groupByDate = (entries: PipelineEntry[]): Record<string, PipelineEntry[]> => {
         const groups: Record<string, PipelineEntry[]> = {};
         entries.forEach(entry => {
@@ -76,96 +66,67 @@ export default function SchedulePage() {
     };
 
     const dateGroups = groupByDate(pipelineData);
-    const sortedDates = Object.keys(dateGroups).slice(-4); // Last 4 days max
+    const sortedDates = Object.keys(dateGroups).slice(-4);
 
     const buildDaySchedule = (dateStr: string, entries: PipelineEntry[]): DaySchedule => {
         const parts = dateStr.split(", ");
         const dayName = parts[0] || dateStr;
         const datePart = parts[1] || "";
 
-        // Determine weather from actual sensor data
         const avgRainProb = entries.reduce((sum, e) => sum + e.sensor_data.rain_probability, 0) / entries.length;
         const avgTemp = entries.reduce((sum, e) => sum + e.sensor_data.temperature_c, 0) / entries.length;
 
         let weatherType = "Sunny";
         let weatherIcon = Sun;
         let color = "text-amber-500";
-        if (avgRainProb > 0.6) {
-            weatherType = "Heavy Rain";
-            weatherIcon = CloudRain;
-            color = "text-blue-500";
-        } else if (avgRainProb > 0.3) {
-            weatherType = "Cloudy";
-            weatherIcon = Cloud;
-            color = "text-gray-500";
-        } else if (avgTemp > 30) {
-            weatherType = "Hot";
-            weatherIcon = ThermometerSun;
-            color = "text-orange-400";
-        }
+        if (avgRainProb > 0.6) { weatherType = "Heavy Rain"; weatherIcon = CloudRain; color = "text-blue-500"; }
+        else if (avgRainProb > 0.3) { weatherType = "Cloudy"; weatherIcon = Cloud; color = "text-gray-500"; }
+        else if (avgTemp > 30) { weatherType = "Hot"; weatherIcon = ThermometerSun; color = "text-orange-400"; }
 
-        // Build events from real data
         const events: ScheduleEvent[] = [];
-
-        // Group notable entries
         const irrigating = entries.filter(e => e.sensor_data.is_irrigating);
         const skipped = entries.filter(e => e.sensor_data.rain_probability > 0.6 && !e.sensor_data.is_irrigating);
         const anomalyEntries = entries.filter(e => e.prediction.is_anomaly);
 
         if (irrigating.length > 0) {
-            const first = irrigating[0];
             events.push({
-                time: new Date(first.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                time: new Date(irrigating[0].timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
                 zone: "All Zones",
                 status: "completed",
-                action: `Irrigated (${irrigating.length} ticks, ~${(irrigating.length * 0.5).toFixed(0)} min)`,
+                action: `${t('completed')}: ${irrigating.length} ticks (~${(irrigating.length * 0.5).toFixed(0)} min)`,
             });
         }
 
         if (skipped.length > 0) {
-            const first = skipped[0];
             events.push({
-                time: new Date(first.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                time: new Date(skipped[0].timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
                 zone: "All Zones",
                 status: "skipped",
-                action: `Scheduled irrigation skipped`,
-                reason: `Auto-Skipped: ${(avgRainProb * 100).toFixed(0)}% rain probability detected`,
+                action: `${t('scheduled')}: Irrigation`,
+                reason: `Auto-Skipped: ${(avgRainProb * 100).toFixed(0)}% rain`,
             });
         }
 
-        if (anomalyEntries.length > 0) {
-            anomalyEntries.slice(0, 3).forEach(ae => {
-                events.push({
-                    time: new Date(ae.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                    zone: ae.prediction.anomaly_type,
-                    status: "pending_ai",
-                    action: `AI Alert: ${ae.prediction.anomaly_type}`,
-                    reason: `Confidence: ${(ae.prediction.confidence * 100).toFixed(0)}%`,
-                });
+        anomalyEntries.slice(0, 3).forEach(ae => {
+            events.push({
+                time: new Date(ae.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                zone: ae.prediction.anomaly_type,
+                status: "pending_ai",
+                action: `${t('pendingAI')}: ${ae.prediction.anomaly_type}`,
+                reason: `Confidence: ${(ae.prediction.confidence * 100).toFixed(0)}%`,
             });
-        }
+        });
 
         if (events.length === 0) {
             events.push({
                 time: entries.length > 0 ? new Date(entries[0].timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--:--",
                 zone: "All Zones",
                 status: "completed",
-                action: `${entries.length} sensor readings — Normal operation`,
+                action: `${entries.length} readings — Normal`,
             });
         }
 
-        return {
-            day: dayName,
-            date: datePart,
-            weather: {
-                type: weatherType,
-                temp: `${avgTemp.toFixed(0)}°C`,
-                rainChance: `${(avgRainProb * 100).toFixed(0)}%`,
-                icon: weatherIcon,
-                color,
-            },
-            events,
-        };
+        return { day: dayName, date: datePart, weather: { type: weatherType, temp: `${avgTemp.toFixed(0)}°C`, rainChance: `${(avgRainProb * 100).toFixed(0)}%`, icon: weatherIcon, color }, events };
     };
 
     const scheduleData = sortedDates.map(date => buildDaySchedule(date, dateGroups[date]));
@@ -175,7 +136,7 @@ export default function SchedulePage() {
             <div className="min-h-screen bg-green-50/50 p-4 md:p-8 font-sans text-green-950 flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
                     <Loader2 className="w-10 h-10 text-green-600 animate-spin" />
-                    <p className="text-green-700 font-medium">Loading schedule from pipeline data...</p>
+                    <p className="text-green-700 font-medium">Loading schedule...</p>
                 </div>
             </div>
         );
@@ -188,13 +149,13 @@ export default function SchedulePage() {
                     <div>
                         <h1 className="text-3xl font-bold text-green-800 flex items-center gap-2">
                             <CalendarRange className="w-8 h-8 text-green-600" />
-                            Smart Scheduling Engine
+                            {t('title')}
                         </h1>
-                        <p className="text-green-700/80 mt-1">Derived from real pipeline history — {totalEntries} readings analyzed</p>
+                        <p className="text-green-700/80 mt-1">{t('subtitle')} — {totalEntries} readings</p>
                     </div>
                     <div className="bg-blue-50 border border-blue-200 px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm">
                         <CloudRain className="w-5 h-5 text-blue-500" />
-                        <span className="text-sm font-semibold text-blue-900">Pipeline Data Active</span>
+                        <span className="text-sm font-semibold text-blue-900">{t('weatherSyncActive')}</span>
                     </div>
                 </div>
 
@@ -202,13 +163,11 @@ export default function SchedulePage() {
                     <div className="relative z-10 w-full md:w-2/3">
                         <h2 className="text-xl font-bold flex items-center gap-2 mb-2">
                             <Sparkles className="w-5 h-5 text-yellow-300" />
-                            AI Intervention Summary (from Pipeline)
+                            {t('aiSummaryTitle')}
                         </h2>
                         <p className="text-emerald-50 leading-relaxed text-sm">
-                            Based on {totalEntries} pipeline ticks: The AI detected{" "}
-                            <strong>{anomalyMitigated} anomalies</strong>,
-                            skipped <strong>{skippedByRain.length} irrigation cycles</strong> for rain,
-                            saving an estimated <strong>{estimatedLitersSaved.toLocaleString()} Liters</strong> of water.
+                            {anomalies.length} anomalies detected, {skippedByRain.length} irrigation cycles skipped for rain.
+                            Estimated {estimatedLitersSaved.toLocaleString()} liters saved.
                         </p>
                     </div>
                     <CloudRain className="absolute -right-4 -bottom-4 w-32 h-32 text-emerald-500/30 rotate-12" />
@@ -217,7 +176,7 @@ export default function SchedulePage() {
                 <div className="space-y-4">
                     {scheduleData.length === 0 ? (
                         <Card className="border-green-200 shadow-sm p-8 text-center text-green-600/70">
-                            <p>No pipeline data available yet. The schedule populates as the IoT simulator runs.</p>
+                            <p>{t('noActions')}</p>
                         </Card>
                     ) : (
                         scheduleData.map((day, idx) => (
@@ -260,9 +219,7 @@ export default function SchedulePage() {
                                                         )}
                                                         {ev.status === "pending_ai" && (
                                                             <div className="text-orange-600 text-sm">
-                                                                <span className="flex items-center gap-2 font-medium">
-                                                                    <Sparkles className="w-3 h-3" /> {ev.action}
-                                                                </span>
+                                                                <span className="flex items-center gap-2 font-medium"><Sparkles className="w-3 h-3" /> {ev.action}</span>
                                                                 <p className="text-xs mt-1 text-orange-600/70">{ev.reason}</p>
                                                             </div>
                                                         )}
@@ -270,8 +227,7 @@ export default function SchedulePage() {
                                                             <div>
                                                                 <span className="text-gray-400 line-through text-sm">{ev.action}</span>
                                                                 <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-red-600 bg-red-100/50 w-max px-2 py-1 rounded-md border border-red-100">
-                                                                    <AlertCircle className="w-3 h-3" />
-                                                                    {ev.reason}
+                                                                    <AlertCircle className="w-3 h-3" />{ev.reason}
                                                                 </div>
                                                             </div>
                                                         )}

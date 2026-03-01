@@ -51,11 +51,11 @@ class WebhookResponse(BaseModel):
     event_id: Optional[str] = None
 
 
-# ── WhatsApp ──────────────────────────────────────────
+# ── WhatsApp Notification ─────────────────────────────
 class WhatsAppSendRequest(BaseModel):
     """Request body for sending WhatsApp notification."""
     message: str = Field(..., min_length=1, max_length=4096, description="Text to send")
-    to: Optional[str] = Field(None, description="Single recipient phone (E.164, e.g. +212612345678)")
+    to: Optional[str] = Field(None, description="Single recipient phone (e.g. +212612345678)")
     recipients: Optional[List[str]] = Field(None, description="List of recipient phones")
 
 
@@ -102,6 +102,31 @@ class StreamConfig(BaseModel):
     features: Optional[List[str]] = None   # subset of columns, None = all
 
 
+# ── Sensor Prediction (Random Forest) ─────────────────
+class SensorPredictionRequest(BaseModel):
+    """Single sensor reading for Random Forest anomaly prediction."""
+    flow_lpm:          float = Field(..., example=34.5,  description="Water flow in L/min")
+    pressure_bar:      float = Field(..., example=2.8,   description="Pipeline pressure in bar")
+    soil_moisture_pct: float = Field(..., example=42.0,  description="Soil moisture %")
+    temperature_c:     float = Field(..., example=27.3,  description="Ambient temperature °C")
+    rain_probability:  float = Field(..., example=0.1,   description="Rain probability 0–1")
+    hour_of_day:       float = Field(..., example=7.0,   description="Hour of day 0–23.99")
+    flow_rolling_mean: float = Field(..., example=34.2,  description="Rolling mean of flow (last 30 min)")
+    flow_rolling_std:  float = Field(..., example=1.2,   description="Rolling std of flow (last 30 min)")
+    pressure_drop:     float = Field(..., example=0.02,  description="Pressure vs rolling mean")
+    flow_deviation:    float = Field(..., example=0.3,   description="Flow vs expected for time-of-day")
+    soil_delta:        float = Field(..., example=0.15,  description="Soil moisture change since last reading")
+    evap_index:        float = Field(..., example=0.21,  description="Temp-adjusted evaporation index")
+
+
+class SensorPredictionResponse(BaseModel):
+    anomaly_id:    int
+    anomaly_type:  str
+    is_anomaly:    bool
+    confidence:    float
+    probabilities: dict
+
+
 # ── Health / Status ───────────────────────────────────
 class HealthStatus(BaseModel):
     status: str = "healthy"
@@ -110,3 +135,6 @@ class HealthStatus(BaseModel):
     data_rows_loaded: int = 0
     active_ws_connections: int = 0
     models_loaded: List[str] = []
+    pipeline_running: Optional[bool] = None
+    pipeline_stats: Optional[dict] = None
+

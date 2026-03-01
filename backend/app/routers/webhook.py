@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Header, Request
 
 from app.config import WEBHOOK_SECRET, WASENDER_WEBHOOK_SECRET
 from app.models.schemas import WebhookPayload, WebhookResponse, WhatsAppSendRequest
+from app.services.whatsapp_service import send_alert as whatsapp_send_alert
 from app.services.whatsapp_service import send_message as whatsapp_send_message
 
 router = APIRouter(prefix="/webhook", tags=["Webhooks"])
@@ -72,8 +73,18 @@ async def ingest_webhook(payload: WebhookPayload):
     message = f"Event '{payload.event_type}' from device '{payload.device_id}' logged."
 
     if payload.event_type == "alert":
-        # In production: trigger notification, SMS, email, etc.
-        message += " ⚠ Alert flagged for review."
+        # Send WhatsApp notification to configured recipients
+        wa_result = whatsapp_send_alert(
+            device_id=payload.device_id,
+            event_type=payload.event_type,
+            data=payload.data,
+        )
+        if wa_result.get("success"):
+            message += f" 📱 WhatsApp sent to {wa_result.get('sent_count', 0)} recipient(s)."
+        elif wa_result.get("error"):
+            message += " ⚠ Alert flagged (WhatsApp not configured or failed)."
+        else:
+            message += " ⚠ Alert flagged for review."
 
     elif payload.event_type == "sensor_reading":
         # In production: feed into AI pipeline for real-time scoring
@@ -197,7 +208,7 @@ async def wasenderapi_webhook(
 @router.post(
     "/whatsapp/send",
     summary="Send WhatsApp notification",
-    description="Send a message to WhatsApp. Connect your AI app to POST here when alerts or anomalies are detected. Requires X-Webhook-Signature header when WEBHOOK_SECRET is set.",
+    description="Send a message to WhatsApp. Connect your AI app to POST here when alerts or anomalies are detected. Optionally include X-Webhook-Signature header for verification when WEBHOOK_SECRET is set.",
 )
 async def send_whatsapp(
     payload: WhatsAppSendRequest,

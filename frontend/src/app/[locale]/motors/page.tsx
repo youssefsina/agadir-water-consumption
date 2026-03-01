@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { Activity, Gauge, Zap, AlertTriangle, PowerOff, Settings, Thermometer, Wifi, WifiOff } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 import { usePipeline } from "@/hooks/use-pipeline";
 
 interface MotorStatus {
@@ -18,22 +17,24 @@ interface MotorStatus {
 }
 
 const MotorRow = ({ motor }: { motor: MotorStatus }) => {
+    const t = useTranslations('motors');
+
     let statusBg = "bg-green-100 text-green-700 border-green-200";
     let statusDot = "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]";
-    let statusText = "ONLINE";
+    let statusText = t('online');
 
     if (motor.status === "WARNING") {
         statusBg = "bg-orange-100 text-orange-700 border-orange-200";
         statusDot = "bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.6)] animate-pulse";
-        statusText = "WARNING";
+        statusText = t('warning');
     } else if (motor.status === "OFFLINE") {
         statusBg = "bg-red-100 text-red-700 border-red-200";
         statusDot = "bg-red-500";
-        statusText = "OFFLINE";
+        statusText = t('offline');
     } else if (motor.status === "MAINTENANCE") {
         statusBg = "bg-blue-100 text-blue-700 border-blue-200";
         statusDot = "bg-blue-500";
-        statusText = "MAINTENANCE";
+        statusText = t('maintenance');
     }
 
     const tempColor = motor.temperature > 70 ? 'text-red-500 font-bold' : motor.temperature > 50 ? 'text-orange-500 font-bold' : 'text-slate-600';
@@ -61,36 +62,20 @@ const MotorRow = ({ motor }: { motor: MotorStatus }) => {
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full md:w-auto mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-slate-100 md:pl-6">
                 <div className="flex flex-col items-center md:items-start text-center md:text-left">
-                    <span className="text-xs text-slate-500 font-medium mb-1 flex items-center gap-1">
-                        <Gauge size={12} /> Pressure
-                    </span>
-                    <div className="text-lg font-bold text-slate-800">
-                        {motor.pressure.toFixed(1)} <span className="text-xs font-normal text-slate-500">Bar</span>
-                    </div>
+                    <span className="text-xs text-slate-500 font-medium mb-1 flex items-center gap-1"><Gauge size={12} /> {t('pressure')}</span>
+                    <div className="text-lg font-bold text-slate-800">{motor.pressure.toFixed(1)} <span className="text-xs font-normal text-slate-500">Bar</span></div>
                 </div>
                 <div className="flex flex-col items-center md:items-start text-center md:text-left">
-                    <span className="text-xs text-slate-500 font-medium mb-1 flex items-center gap-1">
-                        <Zap size={12} /> Power Flow
-                    </span>
-                    <div className="text-lg font-bold text-slate-800">
-                        {motor.power.toFixed(1)} <span className="text-xs font-normal text-slate-500">kW</span>
-                    </div>
+                    <span className="text-xs text-slate-500 font-medium mb-1 flex items-center gap-1"><Zap size={12} /> {t('power')}</span>
+                    <div className="text-lg font-bold text-slate-800">{motor.power.toFixed(1)} <span className="text-xs font-normal text-slate-500">kW</span></div>
                 </div>
                 <div className="flex flex-col items-center md:items-start text-center md:text-left">
-                    <span className="text-xs text-slate-500 font-medium mb-1 flex items-center gap-1">
-                        <Thermometer size={12} /> Core Temp
-                    </span>
-                    <div className={`text-lg font-bold ${tempColor}`}>
-                        {motor.temperature.toFixed(1)} <span className="text-xs font-normal opacity-70">°C</span>
-                    </div>
+                    <span className="text-xs text-slate-500 font-medium mb-1 flex items-center gap-1"><Thermometer size={12} /> {t('temp')}</span>
+                    <div className={`text-lg font-bold ${tempColor}`}>{motor.temperature.toFixed(1)} <span className="text-xs font-normal opacity-70">°C</span></div>
                 </div>
                 <div className="flex flex-col items-center md:items-start text-center md:text-left">
-                    <span className="text-xs text-slate-500 font-medium mb-1 flex items-center gap-1">
-                        <Activity size={12} /> Health %
-                    </span>
-                    <div className="text-lg font-bold text-slate-800">
-                        {motor.efficiency}<span className="text-xs font-normal text-slate-500">%</span>
-                    </div>
+                    <span className="text-xs text-slate-500 font-medium mb-1 flex items-center gap-1"><Activity size={12} /> {t('efficiency')}</span>
+                    <div className="text-lg font-bold text-slate-800">{motor.efficiency}<span className="text-xs font-normal text-slate-500">%</span></div>
                 </div>
             </div>
         </div>
@@ -98,119 +83,90 @@ const MotorRow = ({ motor }: { motor: MotorStatus }) => {
 };
 
 export default function MotorsPage() {
-    // Get live pipeline data
+    const t = useTranslations('motors');
     const { current, stats, connected } = usePipeline(10);
 
-    // Derive motor data from real pipeline sensor readings
     const sensorData = current?.sensor_data;
     const prediction = current?.prediction;
 
-    // Create motor objects based on real backend data
     const motors: MotorStatus[] = [
         {
             id: "M01",
             name: "Main Pump Station Alpha",
-            status: sensorData
-                ? (sensorData.is_irrigating ? "ONLINE" : "OFFLINE")
-                : "OFFLINE",
+            status: sensorData ? (sensorData.is_irrigating ? "ONLINE" : "OFFLINE") : "OFFLINE",
             pressure: sensorData?.pressure_bar ?? 0,
-            power: sensorData ? sensorData.flow_lpm * 0.38 : 0, // approximate kW from flow
+            power: sensorData ? sensorData.flow_lpm * 0.38 : 0,
             temperature: sensorData?.temperature_c ?? 22,
-            efficiency: prediction
-                ? (prediction.is_anomaly ? Math.max(50, 100 - prediction.confidence * 50) : 94)
-                : 0,
+            efficiency: prediction ? (prediction.is_anomaly ? Math.max(50, 100 - prediction.confidence * 50) : 94) : 0,
             uptime: stats ? `${stats.total_readings} ticks` : "0",
-            lastService: "Live from Backend",
+            lastService: "Live",
         },
         {
             id: "M02",
             name: "Secondary Booster Beta",
-            status: sensorData?.is_irrigating
-                ? (sensorData.pressure_bar > 1.5 ? "ONLINE" : "WARNING")
-                : "OFFLINE",
+            status: sensorData?.is_irrigating ? (sensorData.pressure_bar > 1.5 ? "ONLINE" : "WARNING") : "OFFLINE",
             pressure: sensorData ? sensorData.pressure_bar * 0.9 : 0,
             power: sensorData ? sensorData.flow_lpm * 0.25 : 0,
             temperature: sensorData ? sensorData.temperature_c + 3 : 22,
-            efficiency: prediction
-                ? (prediction.is_anomaly ? 76 : 91)
-                : 0,
+            efficiency: prediction ? (prediction.is_anomaly ? 76 : 91) : 0,
             uptime: stats ? `${stats.total_readings} ticks` : "0",
-            lastService: "Derives from Pipeline",
+            lastService: "Pipeline",
         },
         {
             id: "M03",
             name: "Irrigation Feeder Gamma",
-            status: prediction?.is_anomaly
-                ? "WARNING"
-                : (sensorData?.is_irrigating ? "ONLINE" : "OFFLINE"),
+            status: prediction?.is_anomaly ? "WARNING" : (sensorData?.is_irrigating ? "ONLINE" : "OFFLINE"),
             pressure: sensorData ? sensorData.pressure_bar * 1.1 : 0,
             power: sensorData ? sensorData.flow_lpm * 0.45 : 0,
             temperature: sensorData ? sensorData.temperature_c + 8 : 22,
-            efficiency: prediction
-                ? (prediction.is_anomaly ? Math.max(60, 100 - prediction.confidence * 40) : 88)
-                : 0,
+            efficiency: prediction ? (prediction.is_anomaly ? Math.max(60, 100 - prediction.confidence * 40) : 88) : 0,
             uptime: stats ? `${stats.total_readings} ticks` : "0",
             lastService: prediction?.anomaly_type || "Normal",
         },
         {
             id: "M04",
             name: "Reserve Pump Delta",
-            status: prediction?.anomaly_type === "Pipe_Burst"
-                ? "WARNING"
-                : "OFFLINE",
-            pressure: prediction?.anomaly_type === "Pipe_Burst"
-                ? (sensorData?.pressure_bar ?? 0) * 0.5
-                : 0,
-            power: prediction?.anomaly_type === "Pipe_Burst"
-                ? (sensorData?.flow_lpm ?? 0) * 0.3
-                : 0,
+            status: prediction?.anomaly_type === "Pipe_Burst" ? "WARNING" : "OFFLINE",
+            pressure: prediction?.anomaly_type === "Pipe_Burst" ? (sensorData?.pressure_bar ?? 0) * 0.5 : 0,
+            power: prediction?.anomaly_type === "Pipe_Burst" ? (sensorData?.flow_lpm ?? 0) * 0.3 : 0,
             temperature: 22,
             efficiency: prediction?.anomaly_type === "Pipe_Burst" ? 65 : 0,
             uptime: "Standby",
-            lastService: "Activates on emergency",
+            lastService: "Emergency only",
         },
     ];
 
     return (
         <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans">
             <div className="max-w-6xl mx-auto space-y-6">
-                {/* Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-6">
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-900">Motor Network Overview</h1>
-                        <p className="text-slate-500 mt-1">Live metrics derived from IoT pipeline sensor data.</p>
+                        <h1 className="text-2xl font-bold text-slate-900">{t('title')}</h1>
+                        <p className="text-slate-500 mt-1">{t('subtitle')} — Live from IoT pipeline</p>
                     </div>
-                    <div className="flex items-center gap-3 w-full md:w-auto">
+                    <div className="flex items-center gap-3">
                         <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border ${connected
                             ? "bg-green-50 text-green-700 border-green-200"
                             : "bg-red-50 text-red-700 border-red-200"
                             }`}>
                             {connected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-                            {connected ? "Live Pipeline" : "Disconnected"}
+                            {connected ? "Live" : "Disconnected"}
                         </div>
-                        {stats && (
-                            <div className="text-xs text-slate-500 bg-white px-3 py-1.5 rounded-lg border border-slate-200">
-                                Anomaly Rate: <span className={stats.anomaly_rate > 20 ? "text-red-600 font-bold" : "text-green-600 font-bold"}>{stats.anomaly_rate}%</span>
-                            </div>
-                        )}
                     </div>
                 </div>
 
-                {/* Motors List */}
                 <div className="flex flex-col gap-4">
                     {motors.map((motor) => (
                         <MotorRow key={motor.id} motor={motor} />
                     ))}
                 </div>
 
-                {/* System Note */}
                 <div className="mt-8 p-4 bg-blue-50/50 border border-blue-100 rounded-lg flex items-start gap-4 text-blue-900 overflow-hidden relative">
                     <AlertTriangle className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
                     <div>
-                        <h4 className="font-semibold text-sm">Real-Time Data Source</h4>
+                        <h4 className="font-semibold text-sm">Real-Time Data</h4>
                         <p className="text-sm mt-1 opacity-80">
-                            Motor metrics are derived from the live IoT pipeline data (Flow, Pressure, Temperature).
-                            Power consumption is estimated from flow rate. Anomaly status follows the Random Forest AI model predictions.
+                            Motor metrics are derived from the live IoT pipeline. Power is estimated from flow rate.
                         </p>
                     </div>
                 </div>

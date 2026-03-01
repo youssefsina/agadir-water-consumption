@@ -1,14 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+venv/
+.venv/
+
+# Backend virtualenv (created in backend/ root)
+backend/Lib/
+backend/Scripts/
+backend/Include/
+backend/share/
+backend/pyvenv.cfg
+
+# Large data files
+*.csv
+
+# Node
 node_modules/
 .next/
 out/
-build/
-dist/
-.env
-.env.*.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
 .DS_Store
-__pycache__/
-*.pyc
-*.pyo
-venv/
-env/
-.venv/
+Thumbs.db
+
+# Build
+*.log
