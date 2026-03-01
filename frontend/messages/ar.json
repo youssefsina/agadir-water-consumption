@@ -14,7 +14,7 @@
         "language": "اللغة"
     },
     "dashboard": {
-        "title": "مراقبة AgriFlow AI",
+        "title": "مراقبة SoussFlow",
         "subtitle": "نظام ري ذكي وكشف التسربات",
         "scenarioSimulator": "محاكي السيناريوهات",
         "scenarioNormal": "تشغيل عادي",
@@ -139,7 +139,6 @@
         "deviceList": "قائمة الأجهزة",
         "battery": "البطارية",
         "signal": "الإشارة",
-
         "firmware": "البرنامج الثابت",
         "gateway": "بوابة",
         "flowMeter": "مقياس التدفق",

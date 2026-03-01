@@ -35,8 +35,8 @@ export function AppSidebar({ locale: initialLocale }: { locale?: string }) {
             <SidebarContent>
                 <SidebarGroup>
                     <div className="flex items-center p-4">
-                        <Droplets className={`w-6 h-6 text-green-600 ${iconSpacing}`} />
-                        <span className="font-bold text-lg text-green-900">AgriFlow</span>
+                        <img src="/icone.png" alt="SoussFlow Logo" className={`w-8 h-8 ${iconSpacing}`} />
+                        <span className="font-bold text-lg text-green-900">SoussFlow</span>
                     </div>
                     <SidebarGroupLabel>{t("menu")}</SidebarGroupLabel>
                     <SidebarGroupContent>

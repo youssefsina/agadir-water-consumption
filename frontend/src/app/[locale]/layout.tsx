@@ -8,7 +8,7 @@ import { notFound } from "next/navigation";
 import { routing } from "@/i18n/routing";
 
 export const metadata: Metadata = {
-    title: "AgriFlow AI – Smart Irrigation Monitoring",
+    title: "SoussFlow – Smart Irrigation Monitoring",
     description: "AI-powered irrigation monitoring and leak detection system for Agadir water conservation.",
 };
 

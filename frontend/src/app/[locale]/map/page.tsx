@@ -4,11 +4,10 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Switch } from "@/components/ui/switch";
-import { Map as MapIcon, AlertTriangle, Droplets, Info, Wifi, WifiOff, Settings } from "lucide-react";
+import { Map as MapIcon, AlertTriangle, Droplets, Info, Wifi, WifiOff } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { usePipeline } from "@/hooks/use-pipeline";
+import { useDevMode } from "@/hooks/use-dev-mode";
 import { setAnomalyType } from "@/lib/api";
 import dynamic from "next/dynamic";
 
@@ -28,6 +27,7 @@ interface Zone {
 export default function FarmMapPage() {
     const t = useTranslations('map');
     const { current, stats, connected } = usePipeline(10);
+    const { devMode } = useDevMode();
 
     const realMoisture = current?.sensor_data?.soil_moisture_pct ?? 45;
     const isPipeAnomaly = current?.prediction?.is_anomaly ?? false;
@@ -42,7 +42,6 @@ export default function FarmMapPage() {
     ]);
 
     const [activeAnomaly, setActiveAnomaly] = useState<ZoneId | null>(null);
-    const [showDebug, setShowDebug] = useState<boolean>(false);
 
     useEffect(() => {
         if (!current) return;
@@ -165,36 +164,8 @@ export default function FarmMapPage() {
                 </div>
 
                 {/* System Diagnostics / Testing Tools */}
-                <div className="flex justify-end mb-4">
-                    <Dialog>
-                        <DialogTrigger asChild>
-                            <Button variant="outline" className="gap-2 bg-white text-emerald-800 border-emerald-200 hover:bg-emerald-50 rounded-xl shadow-sm hover:shadow transition-all">
-                                <Settings className="w-5 h-5" />
-                                System Settings
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[425px] rounded-3xl">
-                            <DialogHeader>
-                                <DialogTitle className="text-2xl text-emerald-900 font-bold flex items-center gap-2">
-                                    <Settings className="w-6 h-6 text-emerald-600" />
-                                    System Settings
-                                </DialogTitle>
-                            </DialogHeader>
-                            <div className="py-6 space-y-6">
-                                <div className="flex items-center justify-between bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100">
-                                    <div className="space-y-0.5">
-                                        <h4 className="font-bold text-emerald-900">Developer Debug Mode</h4>
-                                        <p className="text-sm text-emerald-700/80 font-medium">Show advanced map simulator tools.</p>
-                                    </div>
-                                    <Switch checked={showDebug} onCheckedChange={setShowDebug} />
-                                </div>
-                            </div>
-                        </DialogContent>
-                    </Dialog>
-                </div>
-
-                {showDebug && (
-                    <details className="group border border-emerald-200 bg-white shadow-sm rounded-2xl overflow-hidden [&_summary::-webkit-details-marker]:hidden" open>
+                {devMode && (
+                    <details className="group border border-emerald-200 bg-white shadow-sm rounded-2xl overflow-hidden [&_summary::-webkit-details-marker]:hidden">
                         <summary className="flex items-center justify-between p-6 cursor-pointer bg-emerald-50/50 hover:bg-emerald-100 transition-colors">
                             <div className="flex items-center gap-3">
                                 <Info className="w-6 h-6 text-emerald-700" />

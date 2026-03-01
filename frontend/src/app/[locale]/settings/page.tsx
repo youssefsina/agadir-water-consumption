@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { useDevMode } from "@/hooks/use-dev-mode";
 import {
     Settings,
     Phone,
@@ -39,6 +41,8 @@ export default function SettingsPage() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
+
+    const { devMode, toggleDevMode } = useDevMode();
 
     // Form state
     const [newName, setNewName] = useState("");
@@ -140,6 +144,30 @@ export default function SettingsPage() {
                     </div>
                 )}
 
+                {/* System Preferences Card */}
+                <Card className="rounded-3xl border-2 border-green-200 shadow-md">
+                    <CardHeader>
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-xl bg-green-100">
+                                <Settings className="w-6 h-6 text-green-600" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-lg">System Preferences</CardTitle>
+                                <CardDescription>Configure global app behavior</CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <div className="flex items-center justify-between p-4 rounded-2xl bg-green-50/50 border border-green-100">
+                            <div className="space-y-0.5">
+                                <h4 className="font-bold text-green-900">Developer Debug Mode</h4>
+                                <p className="text-sm text-green-700/80 font-medium">Show advanced simulator and testing tools on Dashboard and Map.</p>
+                            </div>
+                            <Switch checked={devMode} onCheckedChange={toggleDevMode} />
+                        </div>
+                    </CardContent>
+                </Card>
+
                 {/* WhatsApp Notifications Card */}
                 <Card className="rounded-3xl border-2 border-green-200 shadow-md">
                     <CardHeader>
@@ -229,17 +257,15 @@ export default function SettingsPage() {
                                     {contacts.map((contact) => (
                                         <div
                                             key={contact.id}
-                                            className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                                                contact.active
+                                            className={`flex items-center justify-between p-3 rounded-xl border transition-all ${contact.active
                                                     ? "bg-white border-green-200 hover:border-green-400"
                                                     : "bg-gray-50 border-gray-200 opacity-60"
-                                            }`}
+                                                }`}
                                         >
                                             <div className="flex items-center gap-3">
                                                 <div
-                                                    className={`w-2 h-2 rounded-full ${
-                                                        contact.active ? "bg-green-500" : "bg-gray-400"
-                                                    }`}
+                                                    className={`w-2 h-2 rounded-full ${contact.active ? "bg-green-500" : "bg-gray-400"
+                                                        }`}
                                                 />
                                                 <div>
                                                     <p className="font-medium text-sm">{contact.name}</p>

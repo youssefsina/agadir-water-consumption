@@ -14,7 +14,7 @@
         "language": "Langue"
     },
     "dashboard": {
-        "title": "AgriFlow AI Surveillance",
+        "title": "SoussFlow AI Surveillance",
         "subtitle": "Système intelligent de gestion et détection de fuites",
         "scenarioSimulator": "Simulateur de scénarios",
         "scenarioNormal": "Fonctionnement normal",
@@ -139,7 +139,6 @@
         "deviceList": "Liste des appareils",
         "battery": "Batterie",
         "signal": "Signal",
-
         "firmware": "Firmware",
         "gateway": "Passerelle",
         "flowMeter": "Débitmètre",

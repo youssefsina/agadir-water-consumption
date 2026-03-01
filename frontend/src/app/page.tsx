@@ -162,8 +162,8 @@ export default function Dashboard() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold text-green-800 flex items-center gap-2">
-              <Droplets className="w-8 h-8 text-green-600" />
-              AgriFlow AI Monitoring
+              <img src="/icone.png" alt="SoussFlow Logo" className="w-8 h-8" />
+              SoussFlow AI Monitoring
             </h1>
             <p className="text-green-700/80 mt-1">Smart irrigation & leak detection system</p>
           </div>

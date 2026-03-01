@@ -92,7 +92,7 @@ export default function AnalyticsPage() {
 
     // Estimate water savings based on anomaly count
     const estimatedLitersSaved = totalAnomalies * 850; // rough per-incident estimate
-    const estimatedMoneySaved = (estimatedLitersSaved * 0.007).toFixed(0); // ~$0.007 per liter in Agadir area
+    const estimatedMoneySaved = (estimatedLitersSaved * 0.7).toFixed(0); // ~0.7 MAD per liter in Agadir area
 
     if (loading) {
         return (
@@ -155,7 +155,7 @@ export default function AnalyticsPage() {
                                         <CircleDollarSign className="w-4 h-4" /> Est. Money Saved
                                     </p>
                                     <h2 className="text-5xl font-black tracking-tight">
-                                        ${estimatedMoneySaved}
+                                        {estimatedMoneySaved} MAD
                                     </h2>
                                 </div>
                             </div>

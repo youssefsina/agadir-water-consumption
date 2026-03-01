@@ -33,6 +33,7 @@ import {
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { usePipeline } from "@/hooks/use-pipeline";
 import { useSupabaseData } from "@/hooks/use-supabase-data";
+import { useDevMode } from "@/hooks/use-dev-mode";
 import {
     setAnomalyType,
     getHealth,
@@ -81,7 +82,9 @@ export default function Dashboard() {
     const [scenario, setScenario] = useState<Scenario>("NORMAL");
     const [decision, setDecision] = useState<DecisionState>("ON");
     const [alerts, setAlerts] = useState<AlertItem[]>([]);
-    const [showDebug, setShowDebug] = useState<boolean>(false);
+
+    const { devMode } = useDevMode();
+
     const [currentData, setCurrentData] = useState<ChartPoint>({
         time: "--:--",
         flow: 0,
@@ -103,19 +106,34 @@ export default function Dashboard() {
 
     // Use DB data as fallback when pipeline has no history yet
     useEffect(() => {
-        if (history.length === 0 && dbReadings.length > 0) {
-            const points: ChartPoint[] = dbReadings.slice(-30).map((r) => ({
-                time: new Date(r.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-                flow: r.flow_lpm,
-                pressure: r.pressure_bar,
-                moisture: r.soil_moisture_pct,
-                temperature: r.temperature_c,
-                anomalyScore: r.anomaly_label ? r.anomaly_confidence * 100 : Math.max(5, r.anomaly_confidence * 20),
-            }));
-            setChartData(points);
-            if (points.length > 0) setCurrentData(points[points.length - 1]);
+        if (dbReadings.length > 0) {
+            if (history.length === 0) {
+                const points: ChartPoint[] = dbReadings.slice(-30).map((r) => ({
+                    time: new Date(r.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+                    flow: r.flow_lpm,
+                    pressure: r.pressure_bar,
+                    moisture: r.soil_moisture_pct,
+                    temperature: r.temperature_c,
+                    anomalyScore: r.anomaly_label ? r.anomaly_confidence * 100 : Math.max(5, r.anomaly_confidence * 20),
+                }));
+                setChartData(points);
+                if (points.length > 0) setCurrentData(points[points.length - 1]);
+            }
+            if (alerts.length === 0) {
+                const histAlerts = dbReadings
+                    .filter((r) => r.anomaly_label === 1)
+                    .slice(-10)
+                    .reverse()
+                    .map((r) => ({
+                        id: String(r.id || Math.random()),
+                        time: new Date(r.timestamp).toLocaleTimeString(),
+                        message: `${r.anomaly_type || "Unknown Anomaly"} detected! Confidence: ${(r.anomaly_confidence * 100).toFixed(0)}%`,
+                        type: "destructive" as const,
+                    }));
+                if (histAlerts.length > 0) setAlerts(histAlerts);
+            }
         }
-    }, [history.length, dbReadings]);
+    }, [history.length, dbReadings, alerts.length]);
 
     // Fetch health and pipeline status periodically (non-blocking)
     useEffect(() => {
@@ -440,36 +458,7 @@ export default function Dashboard() {
                     </Card>
                 </div>
 
-                {/* System Diagnostics / System Engine Tools */}
-                <div className="flex justify-end mb-4">
-                    <Dialog>
-                        <DialogTrigger asChild>
-                            <Button variant="outline" className="gap-2 bg-white text-green-800 border-green-200 hover:bg-green-50 rounded-xl shadow-sm hover:shadow transition-all">
-                                <Settings className="w-5 h-5" />
-                                {t("settings") || "Settings"}
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[425px] rounded-3xl">
-                            <DialogHeader>
-                                <DialogTitle className="text-2xl text-green-900 font-bold flex items-center gap-2">
-                                    <Settings className="w-6 h-6 text-green-600" />
-                                    System Settings
-                                </DialogTitle>
-                            </DialogHeader>
-                            <div className="py-6 space-y-6">
-                                <div className="flex items-center justify-between bg-green-50/50 p-4 rounded-2xl border border-green-100">
-                                    <div className="space-y-0.5">
-                                        <h4 className="font-bold text-green-900">Developer Debug Mode</h4>
-                                        <p className="text-sm text-green-700/80 font-medium">Show advanced simulator tools.</p>
-                                    </div>
-                                    <Switch checked={showDebug} onCheckedChange={setShowDebug} />
-                                </div>
-                            </div>
-                        </DialogContent>
-                    </Dialog>
-                </div>
-
-                {showDebug && (
+                {devMode && (
                     <details className="group border border-emerald-200 bg-white shadow-sm rounded-2xl overflow-hidden [&_summary::-webkit-details-marker]:hidden" open>
                         <summary className="flex items-center justify-between p-6 cursor-pointer bg-emerald-50 hover:bg-emerald-100 transition-colors">
                             <div className="flex items-center gap-3">
