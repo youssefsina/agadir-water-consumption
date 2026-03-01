@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🌊 Smart Irrigation — Control Panel</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+    .header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+      border-bottom: 1px solid #334155;
+      padding: 1.2rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header h1 { font-size: 1.5rem; }
+    .header .uptime { color: #94a3b8; font-size: 0.85rem; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+
+    /* ── Status Cards ─────────────────────── */
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 1.2rem;
+      transition: border-color .2s;
+    }
+    .card:hover { border-color: #3b82f6; }
+    .card-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 0.6rem; }
+    .card-value { font-size: 1.8rem; font-weight: 700; }
+    .card-sub { font-size: 0.8rem; color: #64748b; margin-top: 0.3rem; }
+    .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+    .dot.green { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+    .dot.red { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
+    .dot.yellow { background: #eab308; box-shadow: 0 0 6px #eab308; }
+    .dot.blue { background: #3b82f6; box-shadow: 0 0 6px #3b82f6; }
+
+    /* ── Sections ─────────────────────────── */
+    .section { margin-bottom: 1.5rem; }
+    .section-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.8rem; border-left: 3px solid #3b82f6; padding-left: 0.7rem; }
+
+    /* ── Buttons Grid ─────────────────────── */
+    .btn-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.7rem; }
+    .btn {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      background: #1e293b;
+      color: #e2e8f0;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .btn:hover { background: #334155; border-color: #3b82f6; transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn.danger { border-color: #7f1d1d; }
+    .btn.danger:hover { background: #7f1d1d; border-color: #ef4444; }
+    .btn.success { border-color: #14532d; }
+    .btn.success:hover { background: #14532d; border-color: #22c55e; }
+    .btn.wa { border-color: #166534; }
+    .btn.wa:hover { background: #166534; border-color: #22c55e; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+    .btn .spinner { display: none; width: 14px; height: 14px; border: 2px solid #64748b; border-top-color: #e2e8f0; border-radius: 50%; animation: spin .6s linear infinite; }
+    .btn.loading .spinner { display: inline-block; }
+    .btn.loading { pointer-events: none; opacity: 0.7; }
+
+    /* ── Log / Toast ──────────────────────── */
+    .log-box {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 0.8rem;
+      max-height: 260px;
+      overflow-y: auto;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 0.8rem;
+      line-height: 1.6;
+    }
+    .log-box p { margin: 0; }
+    .log-box .ok { color: #22c55e; }
+    .log-box .warn { color: #eab308; }
+    .log-box .err { color: #ef4444; }
+    .log-box .info { color: #3b82f6; }
+
+    /* ── WhatsApp Section ─────────────────── */
+    .wa-form { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.7rem; }
+    .wa-form input, .wa-form textarea {
+      flex: 1; min-width: 200px;
+      padding: 0.6rem 0.8rem;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 0.85rem;
+    }
+    .wa-form textarea { min-height: 60px; resize: vertical; }
+    .wa-form input:focus, .wa-form textarea:focus { outline: none; border-color: #3b82f6; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .fade-in { animation: fadeIn .3s ease; }
+
+    /* ── Live reading ─────────────────────── */
+    .live-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .live-table th { text-align: left; color: #64748b; padding: 0.3rem 0.6rem; font-weight: 500; border-bottom: 1px solid #1e293b; }
+    .live-table td { padding: 0.3rem 0.6rem; border-bottom: 1px solid #1e293b; }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ──────────────────────────────────── -->
+  <div class="header">
+    <h1>🌊 Smart Irrigation — Control Panel</h1>
+    <span class="uptime" id="uptimeLabel">Uptime: loading…</span>
+  </div>
+
+  <div class="container">
+
+    <!-- ── Status Cards ──────────────────────────── -->
+    <div class="cards" id="statusCards">
+      <!-- Health -->
+      <div class="card">
+        <div class="card-title">System Health</div>
+        <div class="card-value"><span class="dot green" id="healthDot"></span> <span id="healthText">{{ health.status }}</span></div>
+        <div class="card-sub">v{{ health.version }} · {{ health.uptime_seconds }}s uptime</div>
+      </div>
+      <!-- Database -->
+      <div class="card">
+        <div class="card-title">Database (Supabase)</div>
+        <div class="card-value">
+          {% if db_connected %}
+            <span class="dot green"></span> Connected
+          {% else %}
+            <span class="dot red"></span> Disconnected
+          {% endif %}
+        </div>
+        <div class="card-sub">{{ health.data_rows_loaded }} rows loaded</div>
+      </div>
+      <!-- AI -->
+      <div class="card">
+        <div class="card-title">AI Models</div>
+        <div class="card-value">
+          {% if health.models_loaded %}
+            <span class="dot green"></span> {{ health.models_loaded | length }} loaded
+          {% else %}
+            <span class="dot yellow"></span> None
+          {% endif %}
+        </div>
+        <div class="card-sub">{{ health.models_loaded | join(', ') or 'No models' }}</div>
+      </div>
+      <!-- Pipeline -->
+      <div class="card">
+        <div class="card-title">Pipeline</div>
+        <div class="card-value">
+          {% if health.pipeline_running %}
+            <span class="dot blue"></span> Running
+          {% else %}
+            <span class="dot red"></span> Stopped
+          {% endif %}
+        </div>
+        <div class="card-sub">{{ health.active_ws_connections }} WS clients · {% if stats %}{{ stats.total_readings }} readings{% endif %}</div>
+      </div>
+      <!-- Anomalies -->
+      <div class="card">
+        <div class="card-title">Anomalies Detected</div>
+        <div class="card-value">
+          {% if stats and stats.anomaly_count > 0 %}
+            <span class="dot red"></span> {{ stats.anomaly_count }}
+          {% else %}
+            <span class="dot green"></span> 0
+          {% endif %}
+        </div>
+        <div class="card-sub">{% if stats %}Rate: {{ stats.anomaly_rate }}% · WA msgs: {{ stats.whatsapp_messages_sent }}{% endif %}</div>
+      </div>
+    </div>
+
+    <!-- ── Simulate Situations ───────────────────── -->
+    <div class="section">
+      <div class="section-title">⚡ Force Situations</div>
+      <p style="color:#64748b; font-size:0.8rem; margin-bottom:0.7rem;">
+        Inject anomalies into the IoT simulator. The next pipeline ticks will reflect the forced situation.
+      </p>
+      <div class="btn-grid">
+        <button class="btn danger" onclick="forceAnomaly(1)">🌙 Night Leak</button>
+        <button class="btn danger" onclick="forceAnomaly(2)">💥 Pipe Burst</button>
+        <button class="btn" onclick="forceAnomaly(3)">💧 Over-Irrigation</button>
+        <button class="btn" onclick="forceAnomaly(4)">🏜️ Under-Irrigation</button>
+        <button class="btn" onclick="forceAnomaly(5)">🌧️ Rain Event</button>
+        <button class="btn success" onclick="forceAnomaly(0)">✅ Reset to Normal</button>
+        <button class="btn" onclick="forceTick()">⏩ Force Tick Now</button>
+      </div>
+    </div>
+
+    <!-- ── WhatsApp ──────────────────────────────── -->
+    <div class="section">
+      <div class="section-title">📱 WhatsApp</div>
+      <div class="wa-form">
+        <input type="text" id="waPhone" placeholder="Phone number (e.g. +212612345678)" />
+        <textarea id="waMessage" placeholder="Message to send…">🌊 Test alert from Smart Irrigation Control Panel</textarea>
+      </div>
+      <div style="margin-top:0.6rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
+        <button class="btn wa" onclick="sendWhatsApp()">📤 Send WhatsApp Message</button>
+        <button class="btn wa" onclick="sendTestAlert()">🚨 Send Test Alert</button>
+      </div>
+    </div>
+
+    <!-- ── Latest Reading ────────────────────────── -->
+    <div class="section">
+      <div class="section-title">📊 Latest Sensor Reading</div>
+      <div id="latestReading" style="overflow-x:auto;">
+        {% if latest %}
+        <table class="live-table">
+          <tr><th>Metric</th><th>Value</th></tr>
+          <tr><td>🕐 Timestamp</td><td>{{ latest.sensor_data.timestamp }}</td></tr>
+          <tr><td>💧 Flow</td><td>{{ latest.sensor_data.flow_lpm }} L/min</td></tr>
+          <tr><td>🔧 Pressure</td><td>{{ latest.sensor_data.pressure_bar }} bar</td></tr>
+          <tr><td>🌱 Soil Moisture</td><td>{{ latest.sensor_data.soil_moisture_pct }}%</td></tr>
+          <tr><td>🌡 Temperature</td><td>{{ latest.sensor_data.temperature_c }}°C</td></tr>
+          <tr><td>🌧 Rain Prob.</td><td>{{ latest.sensor_data.rain_probability }}</td></tr>
+          <tr><td>🤖 Prediction</td><td>{{ latest.prediction.anomaly_type }} ({{ (latest.prediction.confidence * 100) | round(1) }}%)</td></tr>
+          <tr><td>🎯 Ground Truth</td><td>{{ latest.ground_truth.anomaly_type }}</td></tr>
+        </table>
+        {% else %}
+        <p style="color:#64748b;">No readings yet — pipeline may be starting.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ── Action Log ────────────────────────────── -->
+    <div class="section">
+      <div class="section-title">📋 Action Log</div>
+      <div class="log-box" id="logBox">
+        <p class="info">Panel loaded — ready.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const API = '';  // same origin
+
+    function log(msg, type = 'info') {
+      const box = document.getElementById('logBox');
+      const p = document.createElement('p');
+      p.className = type + ' fade-in';
+      const ts = new Date().toLocaleTimeString();
+      p.textContent = `[${ts}] ${msg}`;
+      box.prepend(p);
+      // keep max 100 lines
+      while (box.children.length > 100) box.removeChild(box.lastChild);
+    }
+
+    // ── Force Anomaly ────────────────────────────
+    async function forceAnomaly(id) {
+      const labels = {0:'Normal',1:'Night Leak',2:'Pipe Burst',3:'Over-Irrigation',4:'Under-Irrigation',5:'Rain Event'};
+      log(`Forcing anomaly: ${labels[id] || id}…`, 'warn');
+      try {
+        const res = await fetch(`${API}/panel/api/force-anomaly`, {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ anomaly_id: id, duration: 5 })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          log(`✅ Anomaly set to: ${labels[id]}`, 'ok');
+        } else {
+          log(`⚠ ${data.detail || JSON.stringify(data)}`, 'warn');
+        }
+      } catch (e) {
+        log(`❌ Error: ${e.message}`, 'err');
+      }
+    }
+
+    // ── Force Tick ───────────────────────────────
+    async function forceTick() {
+      log('Forcing pipeline tick…', 'info');
+      try {
+        const res = await fetch(`${API}/panel/api/force-tick`, { method: 'POST' });
+        const data = await res.json();
+        log(`✅ Tick #${data.tick || '?'} — ${data.prediction?.anomaly_type || 'ok'}`, 'ok');
+        setTimeout(() => location.reload(), 600);
+      } catch (e) {
+        log(`❌ Error: ${e.message}`, 'err');
+      }
+    }
+
+    // ── WhatsApp Send ────────────────────────────
+    async function sendWhatsApp() {
+      const phone = document.getElementById('waPhone').value.trim();
+      const message = document.getElementById('waMessage').value.trim();
+      if (!message) { log('Message is empty', 'warn'); return; }
+      log(`Sending WhatsApp to ${phone || 'default recipients'}…`, 'info');
+      try {
+        const res = await fetch(`${API}/panel/api/whatsapp/send`, {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ phone, message })
+        });
+        const data = await res.json();
+        if (data.success) {
+          log(`✅ WhatsApp sent (${data.sent_count} recipients)`, 'ok');
+        } else {
+          log(`⚠ ${data.error || 'Failed'}`, 'warn');
+        }
+      } catch (e) {
+        log(`❌ Error: ${e.message}`, 'err');
+      }
+    }
+
+    async function sendTestAlert() {
+      log('Sending test alert…', 'info');
+      try {
+        const res = await fetch(`${API}/panel/api/whatsapp/test-alert`, { method: 'POST' });
+        const data = await res.json();
+        log(`✅ Test alert result: sent_count=${data.sent_count || 0}`, 'ok');
+      } catch (e) {
+        log(`❌ Error: ${e.message}`, 'err');
+      }
+    }
+
+    // ── Auto-refresh uptime ──────────────────────
+    let startTime = {{ health.uptime_seconds }};
+    setInterval(() => {
+      startTime += 1;
+      document.getElementById('uptimeLabel').textContent = `Uptime: ${startTime}s`;
+    }, 1000);
+
+    // ── Auto-refresh page every 30s ──────────────
+    setTimeout(() => location.reload(), 30000);
+  </script>
+
+</body>
+</html>

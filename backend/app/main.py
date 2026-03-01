@@ -31,7 +31,7 @@ from app.services.pipeline_service import pipeline_manager, pipeline_store
 from app.supabase_client import supabase_client
 
 # Import routers
-from app.routers import webhook, realtime, data, ai, pipeline
+from app.routers import webhook, realtime, data, ai, pipeline, panel
 
 # ── Startup / Shutdown ────────────────────────────────
 _start_time = time.time()
@@ -51,8 +51,12 @@ async def lifespan(app: FastAPI):
     # Start the IoT → AI → Store → Broadcast pipeline
     await pipeline_manager.start()
 
+    # Share startup time with panel router
+    panel._start_time = _start_time
+
     print("\n" + "=" * 55)
     print("  ✅  Ready!  Open http://localhost:8000/docs")
+    print("  🎛️  Control Panel: http://localhost:8000/panel")
     if supabase_client:
         print("  ⚡  Supabase Client connected successfully.")
     else:
@@ -100,6 +104,7 @@ app.include_router(realtime.router)
 app.include_router(data.router)
 app.include_router(ai.router)
 app.include_router(pipeline.router)
+app.include_router(panel.router)
 
 
 # ── Root & Health ─────────────────────────────────────
