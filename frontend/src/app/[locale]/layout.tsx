@@ -36,14 +36,16 @@ export default async function LocaleLayout({
     return (
         <NextIntlClientProvider messages={messages}>
             <SidebarProvider>
-                <AppSidebar locale={locale} />
-                <main className="flex-1 w-full overflow-x-hidden relative">
-                    <SidebarTrigger className={`m-4 absolute z-50 bg-white/80 backdrop-blur shadow-sm border ${triggerPosition}`} />
-                    <div className={`fixed top-4 ${languageSwitcherPosition} z-50`}>
-                        <LanguageSwitcher />
-                    </div>
-                    {children}
-                </main>
+                <div dir={dir} className="flex flex-1 w-full min-h-svh">
+                    <AppSidebar locale={locale} />
+                    <main className="flex-1 w-full overflow-x-hidden relative">
+                        <SidebarTrigger className={`m-4 absolute z-50 bg-white/80 backdrop-blur shadow-sm border ${triggerPosition}`} />
+                        <div className={`fixed top-4 ${languageSwitcherPosition} z-50`}>
+                            <LanguageSwitcher />
+                        </div>
+                        {children}
+                    </main>
+                </div>
             </SidebarProvider>
         </NextIntlClientProvider>
     );

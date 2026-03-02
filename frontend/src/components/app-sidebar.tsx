@@ -28,25 +28,24 @@ export function AppSidebar({ locale: initialLocale }: { locale?: string }) {
     ] as const;
 
     const sidebarSide = locale === "ar" ? "right" : "left";
-    const iconSpacing = locale === "ar" ? "ml-2" : "mr-2";
 
     return (
         <Sidebar side={sidebarSide}>
             <SidebarContent>
                 <SidebarGroup>
                     <div className="flex items-center p-4">
-                        <img src="/icone.png" alt="SoussFlow Logo" className={`w-8 h-8 ${iconSpacing}`} />
-                        <span className="font-bold text-lg text-green-900">SoussFlow</span>
+                        <img src="/icone.png" alt="SoussFlow Logo" className="w-10 h-10 me-2" />
+                        <span className="font-bold text-xl text-green-900">SoussFlow</span>
                     </div>
                     <SidebarGroupLabel>{t("menu")}</SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>
                             {items.map((item) => (
                                 <SidebarMenuItem key={item.titleKey}>
-                                    <SidebarMenuButton asChild>
-                                        <a href={item.url}>
+                                    <SidebarMenuButton size="lg" asChild>
+                                        <a href={item.url} className="[&>svg]:!size-5">
                                             <item.icon />
-                                            <span>{t(item.titleKey)}</span>
+                                            <span className="text-base font-medium">{t(item.titleKey)}</span>
                                         </a>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
